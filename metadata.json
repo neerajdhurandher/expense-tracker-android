@@ -1,0 +1,6 @@
+{
+  "name": "Expense Tracker",
+  "description": "An Android application that tracks expenses manually or from SMS with categories and high-fidelity visualizations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

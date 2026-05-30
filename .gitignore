@@ -1,0 +1,61 @@
+# Built application files
+*.apk
+*.aab
+*.ap_
+
+# Java/Kotlin class files
+*.class
+*.dex
+
+# Generated files
+bin/
+gen/
+out/
+
+# Gradle
+.gradle/
+.kotlin/
+build/
+app/build/
+
+# Local configuration
+local.properties
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Native build
+.externalNativeBuild
+.cxx
+
+# Captures
+/captures
+
+# Keystore files
+*.jks
+*.keystore
+debug.keystore
+my-upload-key.jks
+
+# Environment / secrets
+.env
+google-services.json
+/.idea/codeStyles/codeStyleConfig.xml
+/.idea/codeStyles/Project.xml
+/.idea/.gitignore
+/.idea/.name
+/.idea/AndroidProjectSystem.xml
+/.idea/compiler.xml
+/.idea/copilotDiffState.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/gradle.xml
+/.idea/markdown.xml
+/.idea/migrations.xml
+/.idea/misc.xml
+/.idea/runConfigurations.xml
+/.idea/vcs.xml
