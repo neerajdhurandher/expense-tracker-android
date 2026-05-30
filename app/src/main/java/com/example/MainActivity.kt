@@ -25,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.data.model.Expense
+import com.example.notification.ExpenseNotifier
 import com.example.ui.auth.AuthViewModel
 import com.example.ui.auth.SignInScreen
 import com.example.ui.categories.ManageCategoriesScreen
@@ -143,7 +144,8 @@ class MainActivity : ComponentActivity() {
     private fun handleNotificationIntents(intent: android.content.Intent?, app: ExpenseApp) {
         if (intent == null) return
         val action = intent.action
-        if (action == "QUICK_ADD_EXPENSE") {
+
+        if (action == "QUICK_ADD_EXPENSE" || action == ExpenseNotifier.ACTION_QUICK_SAVE) {
             val amount = intent.getDoubleExtra("amount", 0.0)
             val merchant = intent.getStringExtra("merchant") ?: "Unknown"
             val sender = intent.getStringExtra("sender") ?: "SMS"
@@ -168,12 +170,31 @@ class MainActivity : ComponentActivity() {
                         yearMonth = yearMonthStr
                     )
                     app.expenseRepository.insertExpense(expense)
-                    Toast.makeText(this@MainActivity, "Quick Saved: ₹$amount spent at $merchant", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Saved: ₹$amount at $merchant", Toast.LENGTH_LONG).show()
 
-                    // Cancel notice
+                    // Cancel notification
                     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                    notificationManager.cancel(4001)
+                    notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
                 }
+            }
+        } else if (action == ExpenseNotifier.ACTION_EDIT_EXPENSE) {
+            // Extract SMS data and pass to HomeViewModel for pre-filled edit form
+            val amount = intent.getDoubleExtra("amount", 0.0)
+            val merchant = intent.getStringExtra("merchant") ?: "Unknown"
+            val sender = intent.getStringExtra("sender") ?: "SMS"
+            val rawSms = intent.getStringExtra("rawSms") ?: ""
+            val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
+            val category = intent.getStringExtra("category") ?: "Other"
+
+            if (amount > 0.0) {
+                val homeViewModel: HomeViewModel by viewModels {
+                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository)
+                }
+                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt)
+
+                // Cancel notification
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
             }
         }
     }
@@ -184,6 +205,7 @@ class MainActivity : ComponentActivity() {
 fun PermissionRequestWrapper() {
     val smsPermissionState = rememberPermissionState(android.Manifest.permission.RECEIVE_SMS)
     val readSmsPermissionState = rememberPermissionState(android.Manifest.permission.READ_SMS)
+    val notificationPermissionState = rememberPermissionState(android.Manifest.permission.POST_NOTIFICATIONS)
 
     LaunchedEffect(Unit) {
         if (!smsPermissionState.status.isGranted) {
@@ -191,6 +213,9 @@ fun PermissionRequestWrapper() {
         }
         if (!readSmsPermissionState.status.isGranted) {
             readSmsPermissionState.launchPermissionRequest()
+        }
+        if (!notificationPermissionState.status.isGranted) {
+            notificationPermissionState.launchPermissionRequest()
         }
     }
 }

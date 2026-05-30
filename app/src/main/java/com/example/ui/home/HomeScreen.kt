@@ -51,14 +51,23 @@ fun HomeScreen(
     val expenses by viewModel.expensesList.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val pendingSmsExpense by viewModel.pendingSmsExpense.collectAsState()
 
     var showProfileMenu by remember { mutableStateOf(false) }
     var showAddForm by remember { mutableStateOf(false) }
+    var showSmsEditForm by remember { mutableStateOf(false) }
     var expandedMonthDropdown by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    // Auto-show edit form when a pending SMS expense arrives from notification
+    LaunchedEffect(pendingSmsExpense) {
+        if (pendingSmsExpense != null) {
+            showSmsEditForm = true
+        }
+    }
 
     // Calculated fields based on active state of expenses
     val totalAmount = expenses.sumOf { it.amount }
@@ -478,6 +487,52 @@ fun HomeScreen(
                                     editingExpense = null
                                 },
                                 onDismiss = { editingExpense = null }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // SMS Expense edit form — triggered from notification "Edit" action
+            if (showSmsEditForm && pendingSmsExpense != null) {
+                val smsData = pendingSmsExpense!!
+                Dialog(
+                    onDismissRequest = {
+                        showSmsEditForm = false
+                        viewModel.clearPendingSmsExpense()
+                    },
+                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .clickable {
+                                showSmsEditForm = false
+                                viewModel.clearPendingSmsExpense()
+                            },
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = false) {}
+                        ) {
+                            ExpenseFormSheet(
+                                initialName = smsData.name,
+                                initialAmount = smsData.amount,
+                                initialCategory = smsData.category,
+                                categories = categories,
+                                onSave = { name, amount, category ->
+                                    viewModel.savePendingSmsExpense(name, amount, category)
+                                    showSmsEditForm = false
+                                },
+                                onDismiss = {
+                                    showSmsEditForm = false
+                                    viewModel.clearPendingSmsExpense()
+                                }
                             )
                         }
                     }
