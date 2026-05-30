@@ -54,6 +54,13 @@ class HomeViewModel(
     // Keeps track of the last deleted item for Undo action
     private var recentlyDeletedExpense: Expense? = null
 
+    // Current month in "YYYY-MM" format for edit eligibility check
+    private val currentYearMonth: String = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
+
+    fun isCurrentMonth(expense: Expense): Boolean {
+        return expense.yearMonth == currentYearMonth
+    }
+
     fun selectMonth(month: YearMonthItem?) {
         _selectedMonth.value = month
     }
@@ -121,6 +128,17 @@ class HomeViewModel(
     fun deleteCategory(category: Category) {
         viewModelScope.launch {
             categoryRepository.deleteCategory(category)
+        }
+    }
+
+    fun updateExpense(expense: Expense, name: String, amount: Double, category: String) {
+        viewModelScope.launch {
+            val updated = expense.copy(
+                name = name,
+                amount = amount,
+                category = category
+            )
+            expenseRepository.updateExpense(updated)
         }
     }
 
