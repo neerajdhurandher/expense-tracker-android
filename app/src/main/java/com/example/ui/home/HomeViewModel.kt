@@ -54,6 +54,40 @@ class HomeViewModel(
     // Keeps track of the last deleted item for Undo action
     private var recentlyDeletedExpense: Expense? = null
 
+    // Current month in "YYYY-MM" format for edit eligibility check
+    private val currentYearMonth: String = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
+
+    // Pending SMS expense from notification "Edit" action
+    data class PendingSmsExpense(
+        val name: String,
+        val amount: Double,
+        val category: String,
+        val rawSms: String?,
+        val sender: String?,
+        val occurredAt: Long
+    )
+
+    private val _pendingSmsExpense = MutableStateFlow<PendingSmsExpense?>(null)
+    val pendingSmsExpense: StateFlow<PendingSmsExpense?> = _pendingSmsExpense.asStateFlow()
+
+    fun setPendingSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long) {
+        _pendingSmsExpense.value = PendingSmsExpense(name, amount, category, rawSms, sender, occurredAt)
+    }
+
+    fun clearPendingSmsExpense() {
+        _pendingSmsExpense.value = null
+    }
+
+    fun savePendingSmsExpense(name: String, amount: Double, category: String) {
+        val pending = _pendingSmsExpense.value ?: return
+        addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt)
+        _pendingSmsExpense.value = null
+    }
+
+    fun isCurrentMonth(expense: Expense): Boolean {
+        return expense.yearMonth == currentYearMonth
+    }
+
     fun selectMonth(month: YearMonthItem?) {
         _selectedMonth.value = month
     }
@@ -121,6 +155,17 @@ class HomeViewModel(
     fun deleteCategory(category: Category) {
         viewModelScope.launch {
             categoryRepository.deleteCategory(category)
+        }
+    }
+
+    fun updateExpense(expense: Expense, name: String, amount: Double, category: String) {
+        viewModelScope.launch {
+            val updated = expense.copy(
+                name = name,
+                amount = amount,
+                category = category
+            )
+            expenseRepository.updateExpense(updated)
         }
     }
 

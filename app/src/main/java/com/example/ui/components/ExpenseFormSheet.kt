@@ -38,6 +38,7 @@ fun ExpenseFormSheet(
     initialName: String = "",
     initialAmount: Double? = null,
     initialCategory: String = "Other",
+    isEditMode: Boolean = false,
     categories: List<Category> = emptyList(),
     onSave: (name: String, amount: Double, category: String) -> Unit,
     onDismiss: () -> Unit
@@ -59,7 +60,11 @@ fun ExpenseFormSheet(
     ) {
         // Form Title
         Text(
-            text = if (initialAmount != null) "Capture Expense" else "Log Expense Manually",
+            text = when {
+                isEditMode -> "Edit Expense"
+                initialAmount != null -> "Capture Expense"
+                else -> "Log Expense Manually"
+            },
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = LightText,
@@ -291,7 +296,7 @@ fun ExpenseFormSheet(
                     .testTag("expense_save_btn")
             ) {
                 Text(
-                    text = "Save",
+                    text = if (isEditMode) "Update" else "Save",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )

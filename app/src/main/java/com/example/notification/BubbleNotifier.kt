@@ -1,11 +1,13 @@
 package com.example.notification
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
@@ -20,12 +22,23 @@ object BubbleNotifier {
     private const val CHANNEL_ID = "expense_sms_notifications"
     private const val CHANNEL_NAME = "Expense Alerts"
     private const val NOTIFICATION_ID = 4001
+    private const val TAG = "ExpenseTracker.BubbleNotifier"
 
+    @SuppressLint("MissingPermission")
     fun showBubbleNotification(context: Context, parsedSms: ParsedSms, category: String) {
+        Log.d(TAG, "showBubbleNotification called — amount: ${parsedSms.amount}, merchant: ${parsedSms.merchant}")
+
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Create notification channel (Android 8.0+)
+        // Create or update notification channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Delete old channel if bubbles were not enabled (fixes stale channel config)
+            val existingChannel = notificationManager.getNotificationChannel(CHANNEL_ID)
+            if (existingChannel != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !existingChannel.canBubble()) {
+                Log.w(TAG, "Existing channel has bubbles disabled, deleting and recreating")
+                notificationManager.deleteNotificationChannel(CHANNEL_ID)
+            }
+
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
@@ -37,6 +50,15 @@ object BubbleNotifier {
                 }
             }
             notificationManager.createNotificationChannel(channel)
+            Log.d(TAG, "Notification channel created/updated: $CHANNEL_ID")
+        }
+
+        // Check if notifications are enabled
+        val areNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        Log.d(TAG, "Notifications enabled: $areNotificationsEnabled")
+        if (!areNotificationsEnabled) {
+            Log.e(TAG, "❌ Notifications are DISABLED for this app — bubble cannot show")
+            return
         }
 
         // Target Activity for Bubble
@@ -139,8 +161,11 @@ object BubbleNotifier {
         try {
             val notificationManagerCompat = NotificationManagerCompat.from(context)
             notificationManagerCompat.notify(NOTIFICATION_ID, builder.build())
+            Log.i(TAG, "✅ Notification posted successfully (ID: $NOTIFICATION_ID)")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "❌ SecurityException — POST_NOTIFICATIONS permission not granted", e)
         } catch (e: Exception) {
-            // Handle error gracefully
+            Log.e(TAG, "❌ Failed to post notification", e)
         }
     }
 }

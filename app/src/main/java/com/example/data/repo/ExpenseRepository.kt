@@ -20,6 +20,10 @@ class ExpenseRepository(private val expenseDao: ExpenseDao) {
         expenseDao.deleteExpenseById(id)
     }
 
+    suspend fun updateExpense(expense: Expense) {
+        expenseDao.updateExpense(expense)
+    }
+
     suspend fun getExpenseById(id: Long): Expense? {
         return expenseDao.getExpenseById(id)
     }

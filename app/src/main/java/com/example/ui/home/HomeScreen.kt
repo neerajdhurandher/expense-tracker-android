@@ -51,13 +51,23 @@ fun HomeScreen(
     val expenses by viewModel.expensesList.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val pendingSmsExpense by viewModel.pendingSmsExpense.collectAsState()
 
     var showProfileMenu by remember { mutableStateOf(false) }
     var showAddForm by remember { mutableStateOf(false) }
+    var showSmsEditForm by remember { mutableStateOf(false) }
     var expandedMonthDropdown by remember { mutableStateOf(false) }
+    var editingExpense by remember { mutableStateOf<Expense?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    // Auto-show edit form when a pending SMS expense arrives from notification
+    LaunchedEffect(pendingSmsExpense) {
+        if (pendingSmsExpense != null) {
+            showSmsEditForm = true
+        }
+    }
 
     // Calculated fields based on active state of expenses
     val totalAmount = expenses.sumOf { it.amount }
@@ -375,6 +385,24 @@ fun HomeScreen(
                             ExpenseItemRow(
                                 expense = expense,
                                 categories = categories,
+                                isEditable = viewModel.isCurrentMonth(expense),
+                                onEdit = {
+                                    if (viewModel.isCurrentMonth(expense)) {
+                                        editingExpense = expense
+                                    }
+                                },
+                                onClick = {
+                                    if (viewModel.isCurrentMonth(expense)) {
+                                        editingExpense = expense
+                                    } else {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Only current month's expenses can be edited",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                        }
+                                    }
+                                },
                                 onDelete = {
                                     viewModel.deleteExpense(expense)
                                     // Trigger snackbar undo action
@@ -427,6 +455,89 @@ fun HomeScreen(
                     }
                 }
             }
+
+            // Edit Expense bottom dialog
+            editingExpense?.let { expense ->
+                Dialog(
+                    onDismissRequest = { editingExpense = null },
+                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .clickable { editingExpense = null },
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = false) {}
+                        ) {
+                            ExpenseFormSheet(
+                                initialName = expense.name,
+                                initialAmount = expense.amount,
+                                initialCategory = expense.category,
+                                isEditMode = true,
+                                categories = categories,
+                                onSave = { name, amount, category ->
+                                    viewModel.updateExpense(expense, name, amount, category)
+                                    editingExpense = null
+                                },
+                                onDismiss = { editingExpense = null }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // SMS Expense edit form — triggered from notification "Edit" action
+            if (showSmsEditForm && pendingSmsExpense != null) {
+                val smsData = pendingSmsExpense!!
+                Dialog(
+                    onDismissRequest = {
+                        showSmsEditForm = false
+                        viewModel.clearPendingSmsExpense()
+                    },
+                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .clickable {
+                                showSmsEditForm = false
+                                viewModel.clearPendingSmsExpense()
+                            },
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = false) {}
+                        ) {
+                            ExpenseFormSheet(
+                                initialName = smsData.name,
+                                initialAmount = smsData.amount,
+                                initialCategory = smsData.category,
+                                categories = categories,
+                                onSave = { name, amount, category ->
+                                    viewModel.savePendingSmsExpense(name, amount, category)
+                                    showSmsEditForm = false
+                                },
+                                onDismiss = {
+                                    showSmsEditForm = false
+                                    viewModel.clearPendingSmsExpense()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -436,38 +547,69 @@ fun HomeScreen(
 fun ExpenseItemRow(
     expense: Expense,
     categories: List<Category>,
+    isEditable: Boolean = false,
+    onEdit: () -> Unit = {},
+    onClick: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onDelete()
-                true
-            } else {
-                false
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> {
+                    onDelete()
+                    true
+                }
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    if (isEditable) {
+                        onEdit()
+                    }
+                    false // Don't dismiss, just trigger edit
+                }
+                else -> false
             }
         }
     )
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = false,
+        enableDismissFromStartToEnd = isEditable,
         backgroundContent = {
-            val color = Color(0xFFFF5252)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(color)
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DeleteSweep,
-                    contentDescription = "Swipe to delete",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+            val direction = dismissState.dismissDirection
+            if (direction == SwipeToDismissBoxValue.EndToStart) {
+                // Delete background (swipe left)
+                val color = Color(0xFFFF5252)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(color)
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteSweep,
+                        contentDescription = "Swipe to delete",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else if (direction == SwipeToDismissBoxValue.StartToEnd && isEditable) {
+                // Edit background (swipe right)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AccentYellow)
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Swipe to edit",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         },
         content = {
@@ -479,6 +621,8 @@ fun ExpenseItemRow(
                     .fillMaxWidth()
                     .background(DarkSurface, RoundedCornerShape(16.dp))
                     .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { onClick() }
                     .padding(16.dp)
                     .testTag("expense_item_${expense.id}"),
                 verticalAlignment = Alignment.CenterVertically,

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.example.data.model.Expense
 import kotlinx.coroutines.flow.Flow
 
@@ -20,6 +21,9 @@ interface ExpenseDao {
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteExpenseById(id: Long)
+
+    @Update
+    suspend fun updateExpense(expense: Expense)
 
     @Query("SELECT * FROM expenses WHERE id = :id")
     suspend fun getExpenseById(id: Long): Expense?

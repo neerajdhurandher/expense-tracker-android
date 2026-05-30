@@ -53,6 +53,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Receiver for notification Quick Save and Skip actions -->
+        <receiver
+            android:name=".notification.QuickSaveReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
