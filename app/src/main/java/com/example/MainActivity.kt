@@ -32,6 +32,7 @@ import com.example.ui.categories.ManageCategoriesScreen
 import com.example.ui.home.HomeScreen
 import com.example.ui.home.HomeViewModel
 import com.example.ui.graph.GraphScreen
+import com.example.ui.settings.SettingsScreen
 import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.MyApplicationTheme
@@ -106,14 +107,7 @@ class MainActivity : ComponentActivity() {
                                     userName = user.displayName,
                                     userEmail = user.email,
                                     onNavigateToGraph = { navController.navigate("graph") },
-                                    onNavigateToCategories = { navController.navigate("categories") },
-                                    onSignOut = {
-                                        authViewModel.signOut {
-                                            navController.navigate("signin") {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        }
-                                    }
+                                    onNavigateToSettings = { navController.navigate("settings") }
                                 )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -126,6 +120,21 @@ class MainActivity : ComponentActivity() {
                             GraphScreen(
                                 viewModel = homeViewModel,
                                 onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable("settings") {
+                            SettingsScreen(
+                                authViewModel = authViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onNavigateToCategories = { navController.navigate("categories") },
+                                onSignOut = {
+                                    authViewModel.signOut {
+                                        navController.navigate("signin") {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    }
+                                }
                             )
                         }
 

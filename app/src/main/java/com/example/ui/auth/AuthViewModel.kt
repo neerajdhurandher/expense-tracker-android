@@ -19,6 +19,13 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         }
     }
 
+    fun updateProfile(displayName: String, photoUrl: String? = null, onResult: (Result<User>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = authRepository.updateProfile(displayName, photoUrl)
+            onResult(result)
+        }
+    }
+
     fun signOut(onResult: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val result = authRepository.signOut()

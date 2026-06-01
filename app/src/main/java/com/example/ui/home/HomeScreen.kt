@@ -44,8 +44,7 @@ fun HomeScreen(
     userName: String,
     userEmail: String,
     onNavigateToGraph: (String) -> Unit,
-    onNavigateToCategories: () -> Unit,
-    onSignOut: () -> Unit
+    onNavigateToSettings: () -> Unit
 ) {
     val expenses by viewModel.expensesList.collectAsState()
     val untrackedExpenses by viewModel.untrackedExpenses.collectAsState()
@@ -168,22 +167,13 @@ fun HomeScreen(
                                 modifier = Modifier.background(DarkSurface)
                             ) {
                                 DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Default.Category, contentDescription = "Category manage", tint = LightText) },
-                                    text = { Text("Manage Categories", color = LightText) },
+                                    leadingIcon = { Icon(Icons.Default.Settings, contentDescription = "Settings", tint = LightText) },
+                                    text = { Text("Settings", color = LightText) },
                                     onClick = {
                                         showProfileMenu = false
-                                        onNavigateToCategories()
+                                        onNavigateToSettings()
                                     },
-                                    modifier = Modifier.testTag("menu_manage_categories")
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Default.ExitToApp, contentDescription = "Sign out action", tint = LightText) },
-                                    text = { Text("Sign Out", color = LightText) },
-                                    onClick = {
-                                        showProfileMenu = false
-                                        onSignOut()
-                                    },
-                                    modifier = Modifier.testTag("menu_sign_out")
+                                    modifier = Modifier.testTag("menu_settings")
                                 )
                             }
                         }
