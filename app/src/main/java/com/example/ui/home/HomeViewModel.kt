@@ -32,15 +32,24 @@ class HomeViewModel(
     private val _selectedMonth = MutableStateFlow<YearMonthItem?>(availableMonths.firstOrNull())
     val selectedMonth: StateFlow<YearMonthItem?> = _selectedMonth.asStateFlow()
 
+    // Only tracked expenses for history & totals
     @OptIn(ExperimentalCoroutinesApi::class)
     val expensesList: StateFlow<List<Expense>> = _selectedMonth
         .flatMapLatest { monthItem ->
             if (monthItem == null) {
-                expenseRepository.allExpenses
+                expenseRepository.allTrackedExpenses
             } else {
-                expenseRepository.getExpensesByMonth(monthItem.queryValue)
+                expenseRepository.getTrackedExpensesByMonth(monthItem.queryValue)
             }
         }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // All untracked expenses (no month filter — show all pending)
+    val untrackedExpenses: StateFlow<List<Expense>> = expenseRepository.allUntrackedExpenses
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -75,14 +84,15 @@ class HomeViewModel(
         val rawSms: String?,
         val sender: String?,
         val occurredAt: Long,
-        val paymentSource: String = "UPI"
+        val paymentSource: String = "UPI",
+        val expenseId: Long = -1L // Links to the pre-inserted untracked DB row
     )
 
     private val _pendingSmsExpense = MutableStateFlow<PendingSmsExpense?>(null)
     val pendingSmsExpense: StateFlow<PendingSmsExpense?> = _pendingSmsExpense.asStateFlow()
 
-    fun setPendingSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long, paymentSource: String = "UPI") {
-        _pendingSmsExpense.value = PendingSmsExpense(name, amount, category, rawSms, sender, occurredAt, paymentSource)
+    fun setPendingSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long, paymentSource: String = "UPI", expenseId: Long = -1L) {
+        _pendingSmsExpense.value = PendingSmsExpense(name, amount, category, rawSms, sender, occurredAt, paymentSource, expenseId)
     }
 
     fun clearPendingSmsExpense() {
@@ -91,8 +101,57 @@ class HomeViewModel(
 
     fun savePendingSmsExpense(name: String, amount: Double, category: String, paymentSource: String) {
         val pending = _pendingSmsExpense.value ?: return
-        addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt, paymentSource)
+        if (pending.expenseId > 0) {
+            // Update existing untracked expense and mark tracked
+            viewModelScope.launch {
+                val existing = expenseRepository.getExpenseById(pending.expenseId)
+                if (existing != null) {
+                    val updated = existing.copy(
+                        name = name,
+                        amount = amount,
+                        category = category,
+                        paymentSource = paymentSource,
+                        isTracked = true
+                    )
+                    expenseRepository.updateExpense(updated)
+                }
+            }
+        } else {
+            // Fallback: insert as new (backward compat)
+            addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt, paymentSource)
+        }
         _pendingSmsExpense.value = null
+    }
+
+    // --- Untracked expense actions ---
+
+    /** Confirm an untracked expense as-is (mark tracked) */
+    fun confirmExpense(expense: Expense) {
+        viewModelScope.launch {
+            expenseRepository.markAsTracked(expense.id)
+        }
+    }
+
+    /** Confirm an untracked expense with edits */
+    fun confirmExpenseWithEdits(expense: Expense, name: String, amount: Double, category: String, paymentSource: String) {
+        viewModelScope.launch {
+            val updated = expense.copy(
+                name = name,
+                amount = amount,
+                category = category,
+                paymentSource = paymentSource,
+                isTracked = true
+            )
+            expenseRepository.updateExpense(updated)
+        }
+    }
+
+    /** Dismiss (delete) an untracked expense */
+    fun dismissUntrackedExpense(expense: Expense) {
+        viewModelScope.launch {
+            recentlyDeletedExpense = expense
+            expenseRepository.deleteExpenseById(expense.id)
+        }
     }
 
     fun isCurrentMonth(expense: Expense): Boolean {

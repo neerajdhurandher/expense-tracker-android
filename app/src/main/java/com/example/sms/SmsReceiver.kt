@@ -6,8 +6,12 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import com.example.data.database.AppDatabase
+import com.example.data.model.Expense
 import com.example.notification.ExpenseNotifier
 import kotlinx.coroutines.runBlocking
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
@@ -43,8 +47,8 @@ class SmsReceiver : BroadcastReceiver() {
                     Log.i(TAG, "[$index] Category: $category")
 
                     // Detect payment source using DB-backed smartKeywords
+                    val db = AppDatabase.getDatabase(context)
                     val paymentSource = try {
-                        val db = AppDatabase.getDatabase(context)
                         val sources = runBlocking { db.paymentSourceDao().getAllPaymentSourcesList() }
                         val detected = SmsParser.detectPaymentSource(body, sources)
                         Log.i(TAG, "[$index] Payment Source: $detected")
@@ -56,8 +60,34 @@ class SmsReceiver : BroadcastReceiver() {
 
                     val parsedWithSource = parsed.copy(paymentSource = paymentSource)
 
+                    // Insert untracked expense to DB immediately
+                    val expenseId = try {
+                        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                        val yearMonthStr = sdf.format(Date(parsed.occurredAt))
+
+                        val expense = Expense(
+                            name = parsed.merchant ?: sender,
+                            amount = parsed.amount,
+                            category = category,
+                            source = "sms",
+                            rawSms = parsed.rawSms,
+                            sender = parsed.sender,
+                            occurredAt = parsed.occurredAt,
+                            createdAt = System.currentTimeMillis(),
+                            yearMonth = yearMonthStr,
+                            paymentSource = paymentSource,
+                            isTracked = false // Untracked until user acts
+                        )
+                        val id = runBlocking { db.expenseDao().insertExpenseAndGetId(expense) }
+                        Log.i(TAG, "[$index] Expense saved as untracked — ID: $id")
+                        id
+                    } catch (e: Exception) {
+                        Log.e(TAG, "[$index] Failed to save untracked expense", e)
+                        -1L
+                    }
+
                     try {
-                        ExpenseNotifier.showExpenseNotification(context, parsedWithSource, category)
+                        ExpenseNotifier.showExpenseNotification(context, parsedWithSource, category, expenseId)
                         Log.i(TAG, "[$index] Notification sent successfully")
                     } catch (e: Exception) {
                         Log.e(TAG, "[$index] Failed to show notification", e)

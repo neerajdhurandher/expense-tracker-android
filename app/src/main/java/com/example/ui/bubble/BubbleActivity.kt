@@ -42,6 +42,8 @@ class BubbleActivity : ComponentActivity() {
         val rawSms = intent.getStringExtra("rawSms") ?: ""
         val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
         val initialCategory = intent.getStringExtra("category") ?: "Other"
+        val expenseId = intent.getLongExtra("expenseId", -1L)
+        val notificationId = intent.getIntExtra("notificationId", 4001)
 
         val app = application as ExpenseApp
         val expenseRepo = app.expenseRepository
@@ -65,26 +67,42 @@ class BubbleActivity : ComponentActivity() {
                             categories = categories,
                             onSave = { name, finalAmount, category, paymentSource ->
                                 lifecycleScope.launch {
-                                    val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
-                                    val yearMonthStr = sdf.format(Date(occurredAt))
+                                    if (expenseId > 0L) {
+                                        // Update existing untracked expense and mark as tracked
+                                        val existing = expenseRepo.getExpenseById(expenseId)
+                                        if (existing != null) {
+                                            val updated = existing.copy(
+                                                name = name,
+                                                amount = finalAmount,
+                                                category = category,
+                                                paymentSource = paymentSource,
+                                                isTracked = true
+                                            )
+                                            expenseRepo.updateExpense(updated)
+                                        }
+                                    } else {
+                                        // Fallback: insert new expense
+                                        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                                        val yearMonthStr = sdf.format(Date(occurredAt))
 
-                                    val expense = Expense(
-                                        name = name,
-                                        amount = finalAmount,
-                                        category = category,
-                                        source = "sms",
-                                        rawSms = rawSms,
-                                        sender = sender,
-                                        occurredAt = occurredAt,
-                                        createdAt = System.currentTimeMillis(),
-                                        yearMonth = yearMonthStr,
-                                        paymentSource = paymentSource
-                                    )
-                                    expenseRepo.insertExpense(expense)
+                                        val expense = Expense(
+                                            name = name,
+                                            amount = finalAmount,
+                                            category = category,
+                                            source = "sms",
+                                            rawSms = rawSms,
+                                            sender = sender,
+                                            occurredAt = occurredAt,
+                                            createdAt = System.currentTimeMillis(),
+                                            yearMonth = yearMonthStr,
+                                            paymentSource = paymentSource
+                                        )
+                                        expenseRepo.insertExpense(expense)
+                                    }
 
                                     // Clear notification
                                     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                                    notificationManager.cancel(4001)
+                                    notificationManager.cancel(notificationId)
 
                                     Toast.makeText(this@BubbleActivity, "Expense saved: ₹$finalAmount", Toast.LENGTH_SHORT).show()
                                     finish()

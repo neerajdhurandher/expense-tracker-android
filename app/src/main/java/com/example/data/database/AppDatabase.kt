@@ -10,7 +10,7 @@ import com.example.data.model.Category
 import com.example.data.model.Expense
 import com.example.data.model.PaymentSource
 
-@Database(entities = [Expense::class, Category::class, PaymentSource::class], version = 2, exportSchema = false)
+@Database(entities = [Expense::class, Category::class, PaymentSource::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun categoryDao(): CategoryDao
@@ -38,6 +38,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add isTracked column — existing expenses default to tracked (1 = true)
+                db.execSQL("ALTER TABLE expenses ADD COLUMN isTracked INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -45,7 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "expense_tracker_db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance

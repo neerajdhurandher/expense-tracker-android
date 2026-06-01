@@ -146,37 +146,52 @@ class MainActivity : ComponentActivity() {
         val action = intent.action
 
         if (action == "QUICK_ADD_EXPENSE" || action == ExpenseNotifier.ACTION_QUICK_SAVE) {
-            val amount = intent.getDoubleExtra("amount", 0.0)
-            val merchant = intent.getStringExtra("merchant") ?: "Unknown"
-            val sender = intent.getStringExtra("sender") ?: "SMS"
-            val rawSms = intent.getStringExtra("rawSms") ?: ""
-            val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
-            val category = intent.getStringExtra("category") ?: "Other"
-            val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
+            val expenseId = intent.getLongExtra("expenseId", -1L)
+            val notificationId = intent.getIntExtra("notificationId", ExpenseNotifier.NOTIFICATION_ID)
 
-            if (amount > 0.0) {
+            if (expenseId > 0L) {
+                // Mark existing untracked expense as tracked
                 lifecycleScope.launch {
-                    val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
-                    val yearMonthStr = sdf.format(Date(occurredAt))
+                    app.expenseRepository.markAsTracked(expenseId)
+                    val expense = app.expenseRepository.getExpenseById(expenseId)
+                    Toast.makeText(this@MainActivity, "Saved: ₹${expense?.amount} at ${expense?.name}", Toast.LENGTH_LONG).show()
 
-                    val expense = Expense(
-                        name = merchant,
-                        amount = amount,
-                        category = category,
-                        source = "sms",
-                        rawSms = rawSms,
-                        sender = sender,
-                        occurredAt = occurredAt,
-                        createdAt = System.currentTimeMillis(),
-                        yearMonth = yearMonthStr,
-                        paymentSource = paymentSource
-                    )
-                    app.expenseRepository.insertExpense(expense)
-                    Toast.makeText(this@MainActivity, "Saved: ₹$amount at $merchant", Toast.LENGTH_LONG).show()
-
-                    // Cancel notification
                     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                    notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
+                    notificationManager.cancel(notificationId)
+                }
+            } else {
+                // Backward compat: fallback to legacy insert if no expenseId
+                val amount = intent.getDoubleExtra("amount", 0.0)
+                val merchant = intent.getStringExtra("merchant") ?: "Unknown"
+                val sender = intent.getStringExtra("sender") ?: "SMS"
+                val rawSms = intent.getStringExtra("rawSms") ?: ""
+                val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
+                val category = intent.getStringExtra("category") ?: "Other"
+                val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
+
+                if (amount > 0.0) {
+                    lifecycleScope.launch {
+                        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                        val yearMonthStr = sdf.format(Date(occurredAt))
+
+                        val expense = Expense(
+                            name = merchant,
+                            amount = amount,
+                            category = category,
+                            source = "sms",
+                            rawSms = rawSms,
+                            sender = sender,
+                            occurredAt = occurredAt,
+                            createdAt = System.currentTimeMillis(),
+                            yearMonth = yearMonthStr,
+                            paymentSource = paymentSource
+                        )
+                        app.expenseRepository.insertExpense(expense)
+                        Toast.makeText(this@MainActivity, "Saved: ₹$amount at $merchant", Toast.LENGTH_LONG).show()
+
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                        notificationManager.cancel(notificationId)
+                    }
                 }
             }
         } else if (action == ExpenseNotifier.ACTION_EDIT_EXPENSE) {
@@ -188,16 +203,18 @@ class MainActivity : ComponentActivity() {
             val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
             val category = intent.getStringExtra("category") ?: "Other"
             val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
+            val expenseId = intent.getLongExtra("expenseId", -1L)
+            val notificationId = intent.getIntExtra("notificationId", ExpenseNotifier.NOTIFICATION_ID)
 
             if (amount > 0.0) {
                 val homeViewModel: HomeViewModel by viewModels {
                     HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository)
                 }
-                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt, paymentSource)
+                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt, paymentSource, expenseId)
 
                 // Cancel notification
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
+                notificationManager.cancel(notificationId)
             }
         }
     }

@@ -16,5 +16,6 @@ data class Expense(
     val occurredAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
     val yearMonth: String, // Format: YYYY-MM
-    val paymentSource: String = "UPI" // e.g. "Cash", "UPI", "Credit Card"
+    val paymentSource: String = "UPI", // e.g. "Cash", "UPI", "Credit Card"
+    val isTracked: Boolean = true // false = untracked SMS expense pending user action
 )
