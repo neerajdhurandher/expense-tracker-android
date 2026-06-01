@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import com.example.data.database.AppDatabase
 import com.example.notification.ExpenseNotifier
+import kotlinx.coroutines.runBlocking
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
@@ -39,8 +41,23 @@ class SmsReceiver : BroadcastReceiver() {
                     Log.i(TAG, "[$index] ✅ EXPENSE DETECTED — Amount: ₹${parsed.amount}, Merchant: ${parsed.merchant}")
                     val category = CategoryClassifier.classify(parsed.merchant ?: "")
                     Log.i(TAG, "[$index] Category: $category")
+
+                    // Detect payment source using DB-backed smartKeywords
+                    val paymentSource = try {
+                        val db = AppDatabase.getDatabase(context)
+                        val sources = runBlocking { db.paymentSourceDao().getAllPaymentSourcesList() }
+                        val detected = SmsParser.detectPaymentSource(body, sources)
+                        Log.i(TAG, "[$index] Payment Source: $detected")
+                        detected
+                    } catch (e: Exception) {
+                        Log.w(TAG, "[$index] Failed to detect payment source, defaulting to UPI", e)
+                        "UPI"
+                    }
+
+                    val parsedWithSource = parsed.copy(paymentSource = paymentSource)
+
                     try {
-                        ExpenseNotifier.showExpenseNotification(context, parsed, category)
+                        ExpenseNotifier.showExpenseNotification(context, parsedWithSource, category)
                         Log.i(TAG, "[$index] Notification sent successfully")
                     } catch (e: Exception) {
                         Log.e(TAG, "[$index] Failed to show notification", e)

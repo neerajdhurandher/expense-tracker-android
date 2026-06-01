@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
 
         val app = application as ExpenseApp
         val authViewModel: AuthViewModel by viewModels { AuthViewModel.Factory(app.authRepository) }
-        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository) }
+        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository) }
 
         // Handle standard quick save notification intent tasks
         handleNotificationIntents(intent, app)
@@ -152,6 +152,7 @@ class MainActivity : ComponentActivity() {
             val rawSms = intent.getStringExtra("rawSms") ?: ""
             val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
             val category = intent.getStringExtra("category") ?: "Other"
+            val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
 
             if (amount > 0.0) {
                 lifecycleScope.launch {
@@ -167,7 +168,8 @@ class MainActivity : ComponentActivity() {
                         sender = sender,
                         occurredAt = occurredAt,
                         createdAt = System.currentTimeMillis(),
-                        yearMonth = yearMonthStr
+                        yearMonth = yearMonthStr,
+                        paymentSource = paymentSource
                     )
                     app.expenseRepository.insertExpense(expense)
                     Toast.makeText(this@MainActivity, "Saved: ₹$amount at $merchant", Toast.LENGTH_LONG).show()
@@ -185,12 +187,13 @@ class MainActivity : ComponentActivity() {
             val rawSms = intent.getStringExtra("rawSms") ?: ""
             val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
             val category = intent.getStringExtra("category") ?: "Other"
+            val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
 
             if (amount > 0.0) {
                 val homeViewModel: HomeViewModel by viewModels {
-                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository)
+                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository)
                 }
-                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt)
+                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt, paymentSource)
 
                 // Cancel notification
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager

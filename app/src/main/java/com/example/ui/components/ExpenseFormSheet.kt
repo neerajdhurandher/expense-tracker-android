@@ -4,14 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Label
-import androidx.compose.material.icons.filled.LunchDining
 import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,8 +25,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Category
+import com.example.data.model.PaymentSource
 import com.example.ui.theme.AccentYellow
-import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.LightText
@@ -38,15 +38,19 @@ fun ExpenseFormSheet(
     initialName: String = "",
     initialAmount: Double? = null,
     initialCategory: String = "Other",
+    initialPaymentSource: String = "UPI",
     isEditMode: Boolean = false,
     categories: List<Category> = emptyList(),
-    onSave: (name: String, amount: Double, category: String) -> Unit,
+    paymentSources: List<PaymentSource> = emptyList(),
+    onSave: (name: String, amount: Double, category: String, paymentSource: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
     var amountStr by remember { mutableStateOf(initialAmount?.toString() ?: "") }
     var selectedCategory by remember { mutableStateOf(initialCategory) }
+    var selectedPaymentSource by remember { mutableStateOf(initialPaymentSource) }
     var expandedDropdown by remember { mutableStateOf(false) }
+    var expandedSourceDropdown by remember { mutableStateOf(false) }
 
     var nameError by remember { mutableStateOf<String?>(null) }
     var amountError by remember { mutableStateOf<String?>(null) }
@@ -55,8 +59,11 @@ fun ExpenseFormSheet(
         modifier = Modifier
             .fillMaxWidth()
             .background(DarkSurface)
-            .padding(24.dp)
+            .padding(horizontal = 24.dp)
+            .padding(top = 24.dp, bottom = 16.dp)
             .navigationBarsPadding()
+            .imePadding()
+            .verticalScroll(rememberScrollState())
     ) {
         // Form Title
         Text(
@@ -221,6 +228,84 @@ fun ExpenseFormSheet(
             }
         }
 
+        // Payment Source Selection Dropdown
+        Text(
+            text = "Payment Source",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MutedText,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+        ) {
+            val matchingSourceColorHex = paymentSources.find { it.name == selectedPaymentSource }?.color ?: "#4DABF7"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .border(1.dp, MutedText.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { expandedSourceDropdown = true }
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color(android.graphics.Color.parseColor(matchingSourceColorHex)), RoundedCornerShape(6.dp))
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = selectedPaymentSource,
+                        color = LightText,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Dropdown icon",
+                    tint = MutedText
+                )
+            }
+
+            DropdownMenu(
+                expanded = expandedSourceDropdown,
+                onDismissRequest = { expandedSourceDropdown = false },
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .background(DarkSurface)
+                    .border(1.dp, MutedText.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+            ) {
+                paymentSources.forEach { source ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(Color(android.graphics.Color.parseColor(source.color)), RoundedCornerShape(5.dp))
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text = source.name, color = LightText, fontSize = 15.sp)
+                            }
+                        },
+                        onClick = {
+                            selectedPaymentSource = source.name
+                            expandedSourceDropdown = false
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+            }
+        }
+
         // Context check disclaimer if it is from parsed sms
         if (initialAmount != null) {
             Row(
@@ -255,7 +340,6 @@ fun ExpenseFormSheet(
             OutlinedButton(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(24.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = LightText),
                 modifier = Modifier
                     .weight(1f)
@@ -282,7 +366,7 @@ fun ExpenseFormSheet(
                     }
 
                     if (finalName.isNotEmpty() && amount != null && amount > 0.0) {
-                        onSave(finalName, amount, selectedCategory)
+                        onSave(finalName, amount, selectedCategory, selectedPaymentSource)
                     }
                 },
                 shape = RoundedCornerShape(24.dp),

@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.Category
 import com.example.data.model.Expense
+import com.example.data.model.PaymentSource
 import com.example.data.repo.CategoryRepository
 import com.example.data.repo.ExpenseRepository
+import com.example.data.repo.PaymentSourceRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,7 +22,8 @@ data class YearMonthItem(
 
 class HomeViewModel(
     private val expenseRepository: ExpenseRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val paymentSourceRepository: PaymentSourceRepository
 ) : ViewModel() {
 
     // Generate dynamic list of the last 12 months for dropdown
@@ -51,6 +54,13 @@ class HomeViewModel(
             initialValue = emptyList()
         )
 
+    val paymentSources: StateFlow<List<PaymentSource>> = paymentSourceRepository.allPaymentSources
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     // Keeps track of the last deleted item for Undo action
     private var recentlyDeletedExpense: Expense? = null
 
@@ -64,23 +74,24 @@ class HomeViewModel(
         val category: String,
         val rawSms: String?,
         val sender: String?,
-        val occurredAt: Long
+        val occurredAt: Long,
+        val paymentSource: String = "UPI"
     )
 
     private val _pendingSmsExpense = MutableStateFlow<PendingSmsExpense?>(null)
     val pendingSmsExpense: StateFlow<PendingSmsExpense?> = _pendingSmsExpense.asStateFlow()
 
-    fun setPendingSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long) {
-        _pendingSmsExpense.value = PendingSmsExpense(name, amount, category, rawSms, sender, occurredAt)
+    fun setPendingSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long, paymentSource: String = "UPI") {
+        _pendingSmsExpense.value = PendingSmsExpense(name, amount, category, rawSms, sender, occurredAt, paymentSource)
     }
 
     fun clearPendingSmsExpense() {
         _pendingSmsExpense.value = null
     }
 
-    fun savePendingSmsExpense(name: String, amount: Double, category: String) {
+    fun savePendingSmsExpense(name: String, amount: Double, category: String, paymentSource: String) {
         val pending = _pendingSmsExpense.value ?: return
-        addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt)
+        addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt, paymentSource)
         _pendingSmsExpense.value = null
     }
 
@@ -92,7 +103,7 @@ class HomeViewModel(
         _selectedMonth.value = month
     }
 
-    fun addManualExpense(name: String, amount: Double, category: String) {
+    fun addManualExpense(name: String, amount: Double, category: String, paymentSource: String = "UPI") {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
@@ -105,13 +116,14 @@ class HomeViewModel(
                 source = "manual",
                 occurredAt = now,
                 createdAt = now,
-                yearMonth = yearMonthStr
+                yearMonth = yearMonthStr,
+                paymentSource = paymentSource
             )
             expenseRepository.insertExpense(expense)
         }
     }
 
-    fun addParsedSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long) {
+    fun addParsedSmsExpense(name: String, amount: Double, category: String, rawSms: String?, sender: String?, occurredAt: Long, paymentSource: String = "UPI") {
         viewModelScope.launch {
             val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
             val yearMonthStr = sdf.format(Date(occurredAt))
@@ -125,7 +137,8 @@ class HomeViewModel(
                 sender = sender,
                 occurredAt = occurredAt,
                 createdAt = System.currentTimeMillis(),
-                yearMonth = yearMonthStr
+                yearMonth = yearMonthStr,
+                paymentSource = paymentSource
             )
             expenseRepository.insertExpense(expense)
         }
@@ -158,12 +171,25 @@ class HomeViewModel(
         }
     }
 
-    fun updateExpense(expense: Expense, name: String, amount: Double, category: String) {
+    fun addPaymentSource(source: PaymentSource) {
+        viewModelScope.launch {
+            paymentSourceRepository.insertPaymentSource(source)
+        }
+    }
+
+    fun deletePaymentSource(source: PaymentSource) {
+        viewModelScope.launch {
+            paymentSourceRepository.deletePaymentSource(source)
+        }
+    }
+
+    fun updateExpense(expense: Expense, name: String, amount: Double, category: String, paymentSource: String) {
         viewModelScope.launch {
             val updated = expense.copy(
                 name = name,
                 amount = amount,
-                category = category
+                category = category,
+                paymentSource = paymentSource
             )
             expenseRepository.updateExpense(updated)
         }
@@ -189,12 +215,13 @@ class HomeViewModel(
 
     class Factory(
         private val expenseRepo: ExpenseRepository,
-        private val categoryRepo: CategoryRepository
+        private val categoryRepo: CategoryRepository,
+        private val paymentSourceRepo: PaymentSourceRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-                return HomeViewModel(expenseRepo, categoryRepo) as T
+                return HomeViewModel(expenseRepo, categoryRepo, paymentSourceRepo) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

@@ -1,6 +1,5 @@
 package com.example.ui.home
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,17 +15,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Category
 import com.example.data.model.Expense
+import com.example.data.model.PaymentSource
 import com.example.ui.components.ExpenseFormSheet
 import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.CardBorder
@@ -50,6 +47,7 @@ fun HomeScreen(
 ) {
     val expenses by viewModel.expensesList.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val paymentSources by viewModel.paymentSources.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val pendingSmsExpense by viewModel.pendingSmsExpense.collectAsState()
 
@@ -385,6 +383,7 @@ fun HomeScreen(
                             ExpenseItemRow(
                                 expense = expense,
                                 categories = categories,
+                                paymentSources = paymentSources,
                                 isEditable = viewModel.isCurrentMonth(expense),
                                 onEdit = {
                                     if (viewModel.isCurrentMonth(expense)) {
@@ -423,119 +422,82 @@ fun HomeScreen(
                 }
             }
 
-            // Slide up Add Expense bottom dialog
+            // Add Expense ModalBottomSheet
             if (showAddForm) {
-                Dialog(
+                val addSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ModalBottomSheet(
                     onDismissRequest = { showAddForm = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                    sheetState = addSheetState,
+                    containerColor = DarkSurface,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = MutedText.copy(alpha = 0.4f)) }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable { showAddForm = false },
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = false) {}
-                        ) {
-                            ExpenseFormSheet(
-                                categories = categories,
-                                onSave = { name, amount, category ->
-                                    viewModel.addManualExpense(name, amount, category)
-                                    showAddForm = false
-                                },
-                                onDismiss = { showAddForm = false }
-                            )
-                        }
-                    }
+                    ExpenseFormSheet(
+                        categories = categories,
+                        paymentSources = paymentSources,
+                        onSave = { name, amount, category, paymentSource ->
+                            viewModel.addManualExpense(name, amount, category, paymentSource)
+                            showAddForm = false
+                        },
+                        onDismiss = { showAddForm = false }
+                    )
                 }
             }
 
-            // Edit Expense bottom dialog
+            // Edit Expense ModalBottomSheet
             editingExpense?.let { expense ->
-                Dialog(
+                val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ModalBottomSheet(
                     onDismissRequest = { editingExpense = null },
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                    sheetState = editSheetState,
+                    containerColor = DarkSurface,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = MutedText.copy(alpha = 0.4f)) }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable { editingExpense = null },
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = false) {}
-                        ) {
-                            ExpenseFormSheet(
-                                initialName = expense.name,
-                                initialAmount = expense.amount,
-                                initialCategory = expense.category,
-                                isEditMode = true,
-                                categories = categories,
-                                onSave = { name, amount, category ->
-                                    viewModel.updateExpense(expense, name, amount, category)
-                                    editingExpense = null
-                                },
-                                onDismiss = { editingExpense = null }
-                            )
-                        }
-                    }
+                    ExpenseFormSheet(
+                        initialName = expense.name,
+                        initialAmount = expense.amount,
+                        initialCategory = expense.category,
+                        initialPaymentSource = expense.paymentSource,
+                        isEditMode = true,
+                        categories = categories,
+                        paymentSources = paymentSources,
+                        onSave = { name, amount, category, paymentSource ->
+                            viewModel.updateExpense(expense, name, amount, category, paymentSource)
+                            editingExpense = null
+                        },
+                        onDismiss = { editingExpense = null }
+                    )
                 }
             }
 
-            // SMS Expense edit form — triggered from notification "Edit" action
+            // SMS Expense edit ModalBottomSheet — triggered from notification "Edit" action
             if (showSmsEditForm && pendingSmsExpense != null) {
                 val smsData = pendingSmsExpense!!
-                Dialog(
+                val smsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ModalBottomSheet(
                     onDismissRequest = {
                         showSmsEditForm = false
                         viewModel.clearPendingSmsExpense()
                     },
-                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                    sheetState = smsSheetState,
+                    containerColor = DarkSurface,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = MutedText.copy(alpha = 0.4f)) }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable {
-                                showSmsEditForm = false
-                                viewModel.clearPendingSmsExpense()
-                            },
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = false) {}
-                        ) {
-                            ExpenseFormSheet(
-                                initialName = smsData.name,
-                                initialAmount = smsData.amount,
-                                initialCategory = smsData.category,
-                                categories = categories,
-                                onSave = { name, amount, category ->
-                                    viewModel.savePendingSmsExpense(name, amount, category)
-                                    showSmsEditForm = false
-                                },
-                                onDismiss = {
-                                    showSmsEditForm = false
-                                    viewModel.clearPendingSmsExpense()
-                                }
-                            )
+                    ExpenseFormSheet(
+                        initialName = smsData.name,
+                        initialAmount = smsData.amount,
+                        initialCategory = smsData.category,
+                        initialPaymentSource = smsData.paymentSource,
+                        categories = categories,
+                        paymentSources = paymentSources,
+                        onSave = { name, amount, category, paymentSource ->
+                            viewModel.savePendingSmsExpense(name, amount, category, paymentSource)
+                            showSmsEditForm = false
+                        },
+                        onDismiss = {
+                            showSmsEditForm = false
+                            viewModel.clearPendingSmsExpense()
                         }
-                    }
+                    )
                 }
             }
         }
@@ -547,6 +509,7 @@ fun HomeScreen(
 fun ExpenseItemRow(
     expense: Expense,
     categories: List<Category>,
+    paymentSources: List<PaymentSource> = emptyList(),
     isEditable: Boolean = false,
     onEdit: () -> Unit = {},
     onClick: () -> Unit = {},
@@ -671,6 +634,18 @@ fun ExpenseItemRow(
                                 text = expense.category,
                                 fontSize = 11.sp,
                                 color = categoryColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = " • ",
+                                fontSize = 11.sp,
+                                color = MutedText.copy(alpha = 0.5f)
+                            )
+                            val sourceColorHex = paymentSources.find { it.name == expense.paymentSource }?.color ?: "#4DABF7"
+                            Text(
+                                text = expense.paymentSource,
+                                fontSize = 11.sp,
+                                color = Color(android.graphics.Color.parseColor(sourceColorHex)),
                                 fontWeight = FontWeight.Bold
                             )
                             Text(

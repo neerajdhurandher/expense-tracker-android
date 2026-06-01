@@ -35,8 +35,9 @@ class QuickSaveReceiver : BroadcastReceiver() {
         val rawSms = intent.getStringExtra("rawSms") ?: ""
         val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
         val category = intent.getStringExtra("category") ?: "Other"
+        val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
 
-        Log.i(TAG, "Quick Save triggered — ₹$amount at $merchant ($category)")
+        Log.i(TAG, "Quick Save triggered — ₹$amount at $merchant ($category) via $paymentSource")
 
         if (amount <= 0.0) {
             Log.w(TAG, "Invalid amount, skipping save")
@@ -55,7 +56,8 @@ class QuickSaveReceiver : BroadcastReceiver() {
             sender = sender,
             occurredAt = occurredAt,
             createdAt = System.currentTimeMillis(),
-            yearMonth = yearMonthStr
+            yearMonth = yearMonthStr,
+            paymentSource = paymentSource
         )
 
         // Save in background using a coroutine

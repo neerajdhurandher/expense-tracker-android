@@ -63,7 +63,7 @@ class BubbleActivity : ComponentActivity() {
                             initialAmount = if (amount > 0.0) amount else null,
                             initialCategory = initialCategory,
                             categories = categories,
-                            onSave = { name, finalAmount, category ->
+                            onSave = { name, finalAmount, category, paymentSource ->
                                 lifecycleScope.launch {
                                     val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
                                     val yearMonthStr = sdf.format(Date(occurredAt))
@@ -77,7 +77,8 @@ class BubbleActivity : ComponentActivity() {
                                         sender = sender,
                                         occurredAt = occurredAt,
                                         createdAt = System.currentTimeMillis(),
-                                        yearMonth = yearMonthStr
+                                        yearMonth = yearMonthStr,
+                                        paymentSource = paymentSource
                                     )
                                     expenseRepo.insertExpense(expense)
 

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,8 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.Category
-import com.example.data.model.Expense
 import com.example.ui.home.HomeViewModel
 import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.CardBorder
@@ -50,14 +49,19 @@ fun GraphScreen(
 ) {
     val expenses by viewModel.expensesList.collectAsState()
     val categories by viewModel.categories.collectAsState()
+    val paymentSources by viewModel.paymentSources.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
 
-    // Calculate category-wise percentages
+    var viewMode by remember { mutableIntStateOf(0) } // 0 = Category, 1 = Source
+
+    // Calculate totals
     val totalAmount = expenses.sumOf { it.amount }
-    val shares = remember(expenses, categories) {
+
+    val shares = remember(expenses, categories, paymentSources, viewMode) {
         if (expenses.isEmpty()) {
             emptyList()
-        } else {
+        } else if (viewMode == 0) {
+            // Category-wise grouping
             expenses.groupBy { it.category }
                 .map { (catName, items) ->
                     val catTotal = items.sumOf { it.amount }
@@ -67,6 +71,19 @@ fun GraphScreen(
                         totalAmount = catTotal,
                         percentage = if (totalAmount > 0) ((catTotal / totalAmount) * 100f).toFloat() else 0f,
                         colorHex = matchingColorHex
+                    )
+                }.sortedByDescending { it.totalAmount }
+        } else {
+            // Source-wise grouping
+            expenses.groupBy { it.paymentSource }
+                .map { (sourceName, items) ->
+                    val sourceTotal = items.sumOf { it.amount }
+                    val colorHex = paymentSources.find { it.name == sourceName }?.color ?: "#ADB5BD"
+                    CategoryShare(
+                        categoryName = sourceName,
+                        totalAmount = sourceTotal,
+                        percentage = if (totalAmount > 0) ((sourceTotal / totalAmount) * 100f).toFloat() else 0f,
+                        colorHex = colorHex
                     )
                 }.sortedByDescending { it.totalAmount }
         }
@@ -124,6 +141,41 @@ fun GraphScreen(
                     )
                 }
             } else {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Toggle: BY CATEGORY | BY SOURCE
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DarkSurface, RoundedCornerShape(12.dp))
+                        .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    val toggleLabels = listOf("BY CATEGORY", "BY SOURCE")
+                    toggleLabels.forEachIndexed { index, label ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (viewMode == index) AccentYellow else Color.Transparent,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { viewMode = index }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (viewMode == index) DarkBg else MutedText,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // High-Fidelity Donut Chart component with animations
@@ -140,7 +192,7 @@ fun GraphScreen(
 
                 // Section title
                 Text(
-                    text = "Category Share Breakdown",
+                    text = if (viewMode == 0) "Category Breakdown" else "Source Breakdown",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = LightText,

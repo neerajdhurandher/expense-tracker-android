@@ -15,5 +15,6 @@ data class Expense(
     val sender: String? = null,
     val occurredAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
-    val yearMonth: String // Format: YYYY-MM
+    val yearMonth: String, // Format: YYYY-MM
+    val paymentSource: String = "UPI" // e.g. "Cash", "UPI", "Credit Card"
 )

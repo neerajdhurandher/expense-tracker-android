@@ -58,6 +58,7 @@ object ExpenseNotifier {
             putExtra("rawSms", parsedSms.rawSms)
             putExtra("occurredAt", parsedSms.occurredAt)
             putExtra("category", category)
+            putExtra("paymentSource", parsedSms.paymentSource)
         }
         val quickSavePendingIntent = PendingIntent.getBroadcast(
             context, 1, quickSaveIntent,
@@ -73,6 +74,7 @@ object ExpenseNotifier {
             putExtra("rawSms", parsedSms.rawSms)
             putExtra("occurredAt", parsedSms.occurredAt)
             putExtra("category", category)
+            putExtra("paymentSource", parsedSms.paymentSource)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val editPendingIntent = PendingIntent.getActivity(
@@ -93,7 +95,7 @@ object ExpenseNotifier {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setContentTitle("₹${parsedSms.amount} at ${parsedSms.merchant}")
-            .setContentText("Category: $category • Tap to edit & save")
+            .setContentText("Category: $category • via ${parsedSms.paymentSource}")
             .setSubText("Expense Detected")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
