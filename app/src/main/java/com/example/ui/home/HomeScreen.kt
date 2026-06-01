@@ -6,8 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -51,14 +53,16 @@ fun HomeScreen(
     val paymentSources by viewModel.paymentSources.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val pendingSmsExpense by viewModel.pendingSmsExpense.collectAsState()
+    val historyFilter by viewModel.historyFilter.collectAsState()
 
     var showProfileMenu by remember { mutableStateOf(false) }
     var showAddForm by remember { mutableStateOf(false) }
     var showSmsEditForm by remember { mutableStateOf(false) }
-    var expandedMonthDropdown by remember { mutableStateOf(false) }
+    var showMonthSheet by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var editingUntrackedExpense by remember { mutableStateOf<Expense?>(null) }
     var untrackedSectionExpanded by remember { mutableStateOf(true) }
+    var showFilterSheet by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -188,56 +192,63 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
-                // Month Dropdown selector
+                // Month Dropdown + View Analytics row
                 item(key = "month_selector") {
-                    Box(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Month selector button
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
+                                .weight(1f)
+                                .height(48.dp)
                                 .background(DarkSurface, RoundedCornerShape(14.dp))
                                 .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
-                                .clickable { expandedMonthDropdown = true }
-                                .padding(horizontal = 16.dp),
+                                .clickable { showMonthSheet = true }
+                                .padding(horizontal = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.CalendarToday, contentDescription = "Month icon", tint = AccentYellow, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Icon(Icons.Default.CalendarToday, contentDescription = "Month icon", tint = AccentYellow, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = selectedMonth?.displayLabel ?: "All Historic Expenses",
+                                    text = selectedMonth?.displayLabel ?: "All Time",
                                     color = LightText,
-                                    fontSize = 15.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = "arrow", tint = MutedText)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "arrow", tint = MutedText, modifier = Modifier.size(20.dp))
                         }
 
-                        DropdownMenu(
-                            expanded = expandedMonthDropdown,
-                            onDismissRequest = { expandedMonthDropdown = false },
+
+                        // View Analytics button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .background(DarkSurface)
+                                .height(48.dp)
+                                .background(DarkSurface, RoundedCornerShape(14.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(14.dp))
+                                .clickable { onNavigateToGraph(selectedMonth?.queryValue ?: "all") }
+                                .padding(horizontal = 14.dp)
+                                .testTag("view_graph_button")
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("All Time", color = LightText) },
-                                onClick = {
-                                    viewModel.selectMonth(null)
-                                    expandedMonthDropdown = false
-                                }
+                            Icon(
+                                imageVector = Icons.Default.BarChart,
+                                contentDescription = "Graph icon",
+                                tint = AccentYellow,
+                                modifier = Modifier.size(16.dp)
                             )
-                            viewModel.availableMonths.forEach { m ->
-                                DropdownMenuItem(
-                                    text = { Text(m.displayLabel, color = LightText) },
-                                    onClick = {
-                                        viewModel.selectMonth(m)
-                                        expandedMonthDropdown = false
-                                    }
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "View analytics",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = LightText
+                            )
                         }
                     }
 
@@ -413,7 +424,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Section title: History header
+                // Section title: History header with Filter
                 item(key = "history_header") {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -427,26 +438,43 @@ fun HomeScreen(
                             color = LightText
                         )
 
-                        if (expenses.isNotEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clickable { onNavigateToGraph(selectedMonth?.queryValue ?: "all") }
-                                    .testTag("view_graph_button")
-                            ) {
-                                Text(
-                                    text = "VIEW ANALYTICS",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = AccentYellow,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .height(36.dp)
+                                .background(DarkSurface, RoundedCornerShape(10.dp))
+                                .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+                                .clickable { showFilterSheet = true }
+                                .padding(horizontal = 12.dp)
+                                .testTag("filter_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Filter",
+                                tint = if (historyFilter !is HistoryFilter.All) AccentYellow else MutedText,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = when (historyFilter) {
+                                    is HistoryFilter.All -> "Filter"
+                                    is HistoryFilter.Saved -> "Saved"
+                                    is HistoryFilter.ByCategory -> (historyFilter as HistoryFilter.ByCategory).categoryName
+                                    is HistoryFilter.BySource -> (historyFilter as HistoryFilter.BySource).sourceName
+                                },
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (historyFilter !is HistoryFilter.All) AccentYellow else LightText
+                            )
+                            if (historyFilter !is HistoryFilter.All) {
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Icon(
-                                    imageVector = Icons.Default.BarChart,
-                                    contentDescription = "Graph icon",
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear filter",
                                     tint = AccentYellow,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clickable { viewModel.setHistoryFilter(HistoryFilter.All) }
                                 )
                             }
                         }
@@ -636,6 +664,48 @@ fun HomeScreen(
                             editingUntrackedExpense = null
                         },
                         onDismiss = { editingUntrackedExpense = null }
+                    )
+                }
+            }
+
+            // Filter ModalBottomSheet
+            if (showFilterSheet) {
+                val filterSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ModalBottomSheet(
+                    onDismissRequest = { showFilterSheet = false },
+                    sheetState = filterSheetState,
+                    containerColor = DarkSurface,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = MutedText.copy(alpha = 0.4f)) }
+                ) {
+                    FilterSheetContent(
+                        currentFilter = historyFilter,
+                        categories = categories,
+                        paymentSources = paymentSources,
+                        onFilterSelected = { filter ->
+                            viewModel.setHistoryFilter(filter)
+                            showFilterSheet = false
+                        },
+                        onDismiss = { showFilterSheet = false }
+                    )
+                }
+            }
+
+            // Month Selector ModalBottomSheet
+            if (showMonthSheet) {
+                val monthSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                ModalBottomSheet(
+                    onDismissRequest = { showMonthSheet = false },
+                    sheetState = monthSheetState,
+                    containerColor = DarkSurface,
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = MutedText.copy(alpha = 0.4f)) }
+                ) {
+                    MonthPickerSheetContent(
+                        selectedMonth = selectedMonth,
+                        availableMonths = viewModel.availableMonths,
+                        onMonthSelected = { month ->
+                            viewModel.selectMonth(month)
+                            showMonthSheet = false
+                        }
                     )
                 }
             }
@@ -1010,5 +1080,348 @@ fun ExpenseItemRow(
             }
         }
     )
+}
+
+@Composable
+fun MonthPickerSheetContent(
+    selectedMonth: YearMonthItem?,
+    availableMonths: List<YearMonthItem>,
+    onMonthSelected: (YearMonthItem?) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp)
+    ) {
+        Text(
+            text = "Select Month",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = LightText,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        // "All Time" option
+        val allTimeSelected = selectedMonth == null
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (allTimeSelected) AccentYellow.copy(alpha = 0.10f) else Color.Transparent)
+                .clickable { onMonthSelected(null) }
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.AllInclusive,
+                contentDescription = "All Time",
+                tint = if (allTimeSelected) AccentYellow else MutedText,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = "All Time",
+                fontSize = 15.sp,
+                fontWeight = if (allTimeSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (allTimeSelected) AccentYellow else LightText,
+                modifier = Modifier.weight(1f)
+            )
+            if (allTimeSelected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = AccentYellow,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Month list
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 360.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            availableMonths.forEach { month ->
+                val isSelected = selectedMonth?.queryValue == month.queryValue
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) AccentYellow.copy(alpha = 0.10f) else Color.Transparent)
+                        .clickable { onMonthSelected(month) }
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = "Month",
+                        tint = if (isSelected) AccentYellow else MutedText,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(
+                        text = month.displayLabel,
+                        fontSize = 15.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) AccentYellow else LightText,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Selected",
+                            tint = AccentYellow,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FilterSheetContent(
+    currentFilter: HistoryFilter,
+    categories: List<Category>,
+    paymentSources: List<PaymentSource>,
+    onFilterSelected: (HistoryFilter) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showCategoryPicker by remember { mutableStateOf(currentFilter is HistoryFilter.ByCategory) }
+    var showSourcePicker by remember { mutableStateOf(currentFilter is HistoryFilter.BySource) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp)
+    ) {
+        // Sheet title
+        Text(
+            text = "Filter Expenses",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = LightText,
+            modifier = Modifier.padding(bottom = 20.dp)
+        )
+
+        // All option
+        FilterOptionRow(
+            label = "All",
+            icon = Icons.Default.List,
+            isSelected = currentFilter is HistoryFilter.All,
+            onClick = { onFilterSelected(HistoryFilter.All) }
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Saved option
+        FilterOptionRow(
+            label = "Saved",
+            icon = Icons.Default.BookmarkAdded,
+            isSelected = currentFilter is HistoryFilter.Saved,
+            onClick = { onFilterSelected(HistoryFilter.Saved) }
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // By Category option
+        FilterOptionRow(
+            label = "By Category",
+            icon = Icons.Default.Category,
+            isSelected = currentFilter is HistoryFilter.ByCategory,
+            hasSubMenu = true,
+            isExpanded = showCategoryPicker,
+            onClick = {
+                showCategoryPicker = !showCategoryPicker
+                showSourcePicker = false
+            }
+        )
+
+        // Category sub-picker
+        if (showCategoryPicker) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, top = 4.dp, bottom = 4.dp)
+                    .heightIn(max = 240.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                categories.forEach { category ->
+                    val catColorHex = category.color
+                    val catColor = Color(android.graphics.Color.parseColor(catColorHex))
+                    val isSelected = currentFilter is HistoryFilter.ByCategory &&
+                            (currentFilter as HistoryFilter.ByCategory).categoryName == category.name
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) AccentYellow.copy(alpha = 0.12f) else Color.Transparent)
+                            .clickable { onFilterSelected(HistoryFilter.ByCategory(category.name)) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(catColor, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = category.name,
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) AccentYellow else LightText,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = AccentYellow,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // By Source option
+        FilterOptionRow(
+            label = "By Source",
+            icon = Icons.Default.AccountBalanceWallet,
+            isSelected = currentFilter is HistoryFilter.BySource,
+            hasSubMenu = true,
+            isExpanded = showSourcePicker,
+            onClick = {
+                showSourcePicker = !showSourcePicker
+                showCategoryPicker = false
+            }
+        )
+
+        // Source sub-picker
+        if (showSourcePicker) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, top = 4.dp, bottom = 4.dp)
+            ) {
+                paymentSources.forEach { source ->
+                    val sourceColor = Color(android.graphics.Color.parseColor(source.color))
+                    val isSelected = currentFilter is HistoryFilter.BySource &&
+                            (currentFilter as HistoryFilter.BySource).sourceName == source.name
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) AccentYellow.copy(alpha = 0.12f) else Color.Transparent)
+                            .clickable { onFilterSelected(HistoryFilter.BySource(source.name)) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(sourceColor, CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = source.name,
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) AccentYellow else LightText,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = AccentYellow,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clear filter button (only when a filter is active)
+        if (currentFilter !is HistoryFilter.All) {
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = { onFilterSelected(HistoryFilter.All) },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+            ) {
+                Icon(Icons.Default.FilterListOff, contentDescription = "Clear filter", modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Clear Filter", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterOptionRow(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean,
+    hasSubMenu: Boolean = false,
+    isExpanded: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) AccentYellow.copy(alpha = 0.10f) else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isSelected) AccentYellow else MutedText,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = if (isSelected) AccentYellow else LightText,
+            modifier = Modifier.weight(1f)
+        )
+        if (hasSubMenu) {
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = "Expand",
+                tint = MutedText,
+                modifier = Modifier.size(20.dp)
+            )
+        } else if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = AccentYellow,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
 }
 

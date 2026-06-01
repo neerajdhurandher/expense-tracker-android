@@ -20,6 +20,13 @@ data class YearMonthItem(
     val displayLabel: String   // Format: "Month YYYY"
 )
 
+sealed class HistoryFilter {
+    data object All : HistoryFilter()
+    data object Saved : HistoryFilter()
+    data class ByCategory(val categoryName: String) : HistoryFilter()
+    data class BySource(val sourceName: String) : HistoryFilter()
+}
+
 class HomeViewModel(
     private val expenseRepository: ExpenseRepository,
     private val categoryRepository: CategoryRepository,
@@ -32,21 +39,36 @@ class HomeViewModel(
     private val _selectedMonth = MutableStateFlow<YearMonthItem?>(availableMonths.firstOrNull())
     val selectedMonth: StateFlow<YearMonthItem?> = _selectedMonth.asStateFlow()
 
-    // Only tracked expenses for history & totals
+    private val _historyFilter = MutableStateFlow<HistoryFilter>(HistoryFilter.All)
+    val historyFilter: StateFlow<HistoryFilter> = _historyFilter.asStateFlow()
+
+    fun setHistoryFilter(filter: HistoryFilter) {
+        _historyFilter.value = filter
+    }
+
+    // Only tracked expenses for history & totals, combined with active filter
     @OptIn(ExperimentalCoroutinesApi::class)
-    val expensesList: StateFlow<List<Expense>> = _selectedMonth
-        .flatMapLatest { monthItem ->
-            if (monthItem == null) {
-                expenseRepository.allTrackedExpenses
-            } else {
-                expenseRepository.getTrackedExpensesByMonth(monthItem.queryValue)
+    val expensesList: StateFlow<List<Expense>> = combine(_selectedMonth, _historyFilter) { month, filter ->
+        Pair(month, filter)
+    }.flatMapLatest { (monthItem, filter) ->
+        val baseFlow = if (monthItem == null) {
+            expenseRepository.allTrackedExpenses
+        } else {
+            expenseRepository.getTrackedExpensesByMonth(monthItem.queryValue)
+        }
+        baseFlow.map { expenses ->
+            when (filter) {
+                is HistoryFilter.All -> expenses
+                is HistoryFilter.Saved -> expenses
+                is HistoryFilter.ByCategory -> expenses.filter { it.category == filter.categoryName }
+                is HistoryFilter.BySource -> expenses.filter { it.paymentSource == filter.sourceName }
             }
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
     // All untracked expenses (no month filter — show all pending)
     val untrackedExpenses: StateFlow<List<Expense>> = expenseRepository.allUntrackedExpenses
