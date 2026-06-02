@@ -32,6 +32,9 @@ import com.example.ui.categories.ManageCategoriesScreen
 import com.example.ui.home.HomeScreen
 import com.example.ui.home.HomeViewModel
 import com.example.ui.graph.GraphScreen
+import com.example.ui.budget.BudgetScreen
+import com.example.ui.sourcebudget.SourceBudgetScreen
+import com.example.ui.settings.SettingsScreen
 import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.MyApplicationTheme
@@ -51,7 +54,7 @@ class MainActivity : ComponentActivity() {
 
         val app = application as ExpenseApp
         val authViewModel: AuthViewModel by viewModels { AuthViewModel.Factory(app.authRepository) }
-        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository) }
+        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository, app.budgetRepository) }
 
         // Handle standard quick save notification intent tasks
         handleNotificationIntents(intent, app)
@@ -106,14 +109,8 @@ class MainActivity : ComponentActivity() {
                                     userName = user.displayName,
                                     userEmail = user.email,
                                     onNavigateToGraph = { navController.navigate("graph") },
-                                    onNavigateToCategories = { navController.navigate("categories") },
-                                    onSignOut = {
-                                        authViewModel.signOut {
-                                            navController.navigate("signin") {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        }
-                                    }
+                                    onNavigateToSettings = { navController.navigate("settings") },
+                                    onNavigateToBudget = { navController.navigate("budget") }
                                 )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -129,8 +126,38 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        composable("settings") {
+                            SettingsScreen(
+                                authViewModel = authViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onNavigateToCategories = { navController.navigate("categories") },
+                                onNavigateToSourceBudget = { navController.navigate("source_budget") },
+                                onSignOut = {
+                                    authViewModel.signOut {
+                                        navController.navigate("signin") {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
                         composable("categories") {
                             ManageCategoriesScreen(
+                                viewModel = homeViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable("budget") {
+                            BudgetScreen(
+                                viewModel = homeViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable("source_budget") {
+                            SourceBudgetScreen(
                                 viewModel = homeViewModel,
                                 onNavigateBack = { navController.popBackStack() }
                             )
@@ -146,35 +173,52 @@ class MainActivity : ComponentActivity() {
         val action = intent.action
 
         if (action == "QUICK_ADD_EXPENSE" || action == ExpenseNotifier.ACTION_QUICK_SAVE) {
-            val amount = intent.getDoubleExtra("amount", 0.0)
-            val merchant = intent.getStringExtra("merchant") ?: "Unknown"
-            val sender = intent.getStringExtra("sender") ?: "SMS"
-            val rawSms = intent.getStringExtra("rawSms") ?: ""
-            val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
-            val category = intent.getStringExtra("category") ?: "Other"
+            val expenseId = intent.getLongExtra("expenseId", -1L)
+            val notificationId = intent.getIntExtra("notificationId", ExpenseNotifier.NOTIFICATION_ID)
 
-            if (amount > 0.0) {
+            if (expenseId > 0L) {
+                // Mark existing untracked expense as tracked
                 lifecycleScope.launch {
-                    val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
-                    val yearMonthStr = sdf.format(Date(occurredAt))
+                    app.expenseRepository.markAsTracked(expenseId)
+                    val expense = app.expenseRepository.getExpenseById(expenseId)
+                    Toast.makeText(this@MainActivity, "Saved: ₹${expense?.amount} at ${expense?.name}", Toast.LENGTH_LONG).show()
 
-                    val expense = Expense(
-                        name = merchant,
-                        amount = amount,
-                        category = category,
-                        source = "sms",
-                        rawSms = rawSms,
-                        sender = sender,
-                        occurredAt = occurredAt,
-                        createdAt = System.currentTimeMillis(),
-                        yearMonth = yearMonthStr
-                    )
-                    app.expenseRepository.insertExpense(expense)
-                    Toast.makeText(this@MainActivity, "Saved: ₹$amount at $merchant", Toast.LENGTH_LONG).show()
-
-                    // Cancel notification
                     val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                    notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
+                    notificationManager.cancel(notificationId)
+                }
+            } else {
+                // Backward compat: fallback to legacy insert if no expenseId
+                val amount = intent.getDoubleExtra("amount", 0.0)
+                val merchant = intent.getStringExtra("merchant") ?: "Unknown"
+                val sender = intent.getStringExtra("sender") ?: "SMS"
+                val rawSms = intent.getStringExtra("rawSms") ?: ""
+                val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
+                val category = intent.getStringExtra("category") ?: "Other"
+                val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
+
+                if (amount > 0.0) {
+                    lifecycleScope.launch {
+                        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                        val yearMonthStr = sdf.format(Date(occurredAt))
+
+                        val expense = Expense(
+                            name = merchant,
+                            amount = amount,
+                            category = category,
+                            source = "sms",
+                            rawSms = rawSms,
+                            sender = sender,
+                            occurredAt = occurredAt,
+                            createdAt = System.currentTimeMillis(),
+                            yearMonth = yearMonthStr,
+                            paymentSource = paymentSource
+                        )
+                        app.expenseRepository.insertExpense(expense)
+                        Toast.makeText(this@MainActivity, "Saved: ₹$amount at $merchant", Toast.LENGTH_LONG).show()
+
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                        notificationManager.cancel(notificationId)
+                    }
                 }
             }
         } else if (action == ExpenseNotifier.ACTION_EDIT_EXPENSE) {
@@ -185,16 +229,19 @@ class MainActivity : ComponentActivity() {
             val rawSms = intent.getStringExtra("rawSms") ?: ""
             val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
             val category = intent.getStringExtra("category") ?: "Other"
+            val paymentSource = intent.getStringExtra("paymentSource") ?: "UPI"
+            val expenseId = intent.getLongExtra("expenseId", -1L)
+            val notificationId = intent.getIntExtra("notificationId", ExpenseNotifier.NOTIFICATION_ID)
 
             if (amount > 0.0) {
                 val homeViewModel: HomeViewModel by viewModels {
-                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository)
+                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository, app.budgetRepository)
                 }
-                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt)
+                homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt, paymentSource, expenseId)
 
                 // Cancel notification
                 val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-                notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
+                notificationManager.cancel(notificationId)
             }
         }
     }

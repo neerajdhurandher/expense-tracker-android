@@ -7,13 +7,9 @@ import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import com.example.data.database.AppDatabase
-import com.example.data.model.Expense
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class QuickSaveReceiver : BroadcastReceiver() {
     companion object {
@@ -23,71 +19,72 @@ class QuickSaveReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ExpenseNotifier.ACTION_QUICK_SAVE -> handleQuickSave(context, intent)
-            ExpenseNotifier.ACTION_SKIP -> handleSkip(context)
+            ExpenseNotifier.ACTION_SKIP -> handleSkip(context, intent)
             else -> Log.d(TAG, "Unknown action: ${intent.action}")
         }
     }
 
     private fun handleQuickSave(context: Context, intent: Intent) {
-        val amount = intent.getDoubleExtra("amount", 0.0)
-        val merchant = intent.getStringExtra("merchant") ?: "Unknown"
-        val sender = intent.getStringExtra("sender") ?: "SMS"
-        val rawSms = intent.getStringExtra("rawSms") ?: ""
-        val occurredAt = intent.getLongExtra("occurredAt", System.currentTimeMillis())
-        val category = intent.getStringExtra("category") ?: "Other"
+        val expenseId = intent.getLongExtra("expenseId", -1L)
+        val notificationId = intent.getIntExtra("notificationId", ExpenseNotifier.NOTIFICATION_ID)
 
-        Log.i(TAG, "Quick Save triggered — ₹$amount at $merchant ($category)")
+        Log.i(TAG, "Quick Save triggered — expenseId: $expenseId")
 
-        if (amount <= 0.0) {
-            Log.w(TAG, "Invalid amount, skipping save")
+        if (expenseId <= 0L) {
+            Log.w(TAG, "Invalid expenseId, cannot quick save")
+            dismissNotification(context, notificationId)
             return
         }
 
-        val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
-        val yearMonthStr = sdf.format(Date(occurredAt))
-
-        val expense = Expense(
-            name = merchant,
-            amount = amount,
-            category = category,
-            source = "sms",
-            rawSms = rawSms,
-            sender = sender,
-            occurredAt = occurredAt,
-            createdAt = System.currentTimeMillis(),
-            yearMonth = yearMonthStr
-        )
-
-        // Save in background using a coroutine
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val db = AppDatabase.getDatabase(context)
-                db.expenseDao().insertExpense(expense)
-                Log.i(TAG, "✅ Expense saved — ₹$amount at $merchant")
+                db.expenseDao().markAsTracked(expenseId)
+                val expense = db.expenseDao().getExpenseById(expenseId)
+                Log.i(TAG, "✅ Expense #$expenseId marked as tracked — ₹${expense?.amount} at ${expense?.name}")
 
-                // Show toast on main thread
                 CoroutineScope(Dispatchers.Main).launch {
-                    Toast.makeText(context, "Saved: ₹$amount at $merchant", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Saved: ₹${expense?.amount} at ${expense?.name}", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to save expense", e)
+                Log.e(TAG, "❌ Failed to track expense #$expenseId", e)
             } finally {
-                // Dismiss the notification
-                dismissNotification(context)
+                dismissNotification(context, notificationId)
                 pendingResult.finish()
             }
         }
     }
 
-    private fun handleSkip(context: Context) {
-        Log.d(TAG, "Skip action — dismissing notification")
-        dismissNotification(context)
+    private fun handleSkip(context: Context, intent: Intent) {
+        val expenseId = intent.getLongExtra("expenseId", -1L)
+        val notificationId = intent.getIntExtra("notificationId", ExpenseNotifier.NOTIFICATION_ID)
+
+        Log.d(TAG, "Skip action — expenseId: $expenseId")
+
+        if (expenseId <= 0L) {
+            dismissNotification(context, notificationId)
+            return
+        }
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = AppDatabase.getDatabase(context)
+                db.expenseDao().deleteExpenseById(expenseId)
+                Log.d(TAG, "Skipped & deleted untracked expense #$expenseId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete skipped expense #$expenseId", e)
+            } finally {
+                dismissNotification(context, notificationId)
+                pendingResult.finish()
+            }
+        }
     }
 
-    private fun dismissNotification(context: Context) {
+    private fun dismissNotification(context: Context, notificationId: Int) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(ExpenseNotifier.NOTIFICATION_ID)
+        notificationManager.cancel(notificationId)
     }
 }
 

@@ -1,6 +1,7 @@
 package com.example.sms
 
 import com.example.data.model.ParsedSms
+import com.example.data.model.PaymentSource
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -94,5 +95,31 @@ object SmsParser {
             sender
         }
         return clean.trim().uppercase(Locale.ROOT)
+    }
+
+    /**
+     * Detects payment source by matching SMS body against smartKeywords from all PaymentSource entries.
+     * @param smsBody The raw SMS text
+     * @param sources All PaymentSource entries (from DB), each containing a comma-separated `smartKeywords` field
+     * @return The matched PaymentSource name, or "UPI" as default fallback
+     */
+    fun detectPaymentSource(smsBody: String, sources: List<PaymentSource>): String {
+        val bodyLower = smsBody.lowercase(Locale.ROOT)
+
+        // Check custom sources first (user-defined take priority), then presets
+        val sorted = sources.sortedByDescending { it.isCustom }
+
+        for (source in sorted) {
+            if (source.smartKeywords.isBlank()) continue
+            val keywords = source.smartKeywords.lowercase(Locale.ROOT)
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            if (keywords.any { bodyLower.contains(it) }) {
+                return source.name
+            }
+        }
+
+        return "UPI" // Default fallback for most Indian bank SMS
     }
 }
