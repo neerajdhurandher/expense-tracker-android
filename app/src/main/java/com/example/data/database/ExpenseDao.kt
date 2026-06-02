@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.example.data.model.Expense
+import com.example.data.model.SourceSpending
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -49,4 +50,22 @@ interface ExpenseDao {
     // Mark an untracked expense as tracked
     @Query("UPDATE expenses SET isTracked = 1 WHERE id = :id")
     suspend fun markAsTracked(id: Long)
+
+    // Get total tracked spending per source for a month (for budget calculation)
+    @Query("""
+        SELECT paymentSource, SUM(amount) as total 
+        FROM expenses 
+        WHERE yearMonth = :yearMonth AND isTracked = 1 
+        GROUP BY paymentSource
+    """)
+    fun getTrackedSpendingBySourceForMonth(yearMonth: String): Flow<List<SourceSpending>>
+
+    // Suspend version for one-shot queries (e.g. carry-over calculation)
+    @Query("""
+        SELECT paymentSource, SUM(amount) as total 
+        FROM expenses 
+        WHERE yearMonth = :yearMonth AND isTracked = 1 
+        GROUP BY paymentSource
+    """)
+    suspend fun getTrackedSpendingBySourceForMonthList(yearMonth: String): List<SourceSpending>
 }

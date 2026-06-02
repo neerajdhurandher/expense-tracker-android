@@ -34,6 +34,7 @@ fun SettingsScreen(
     authViewModel: AuthViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToCategories: () -> Unit,
+    onNavigateToSourceBudget: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val currentUser by authViewModel.currentUser.collectAsState()
@@ -245,10 +246,20 @@ fun SettingsScreen(
 
             SettingsRow(
                 icon = Icons.Default.Category,
-                title = "Categories & Sources",
-                subtitle = "Manage expense categories and payment sources",
+                title = "Categories",
+                subtitle = "Manage expense categories",
                 onClick = onNavigateToCategories,
                 testTag = "settings_categories_row"
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SettingsRow(
+                icon = Icons.Default.AccountBalanceWallet,
+                title = "Sources & Budget",
+                subtitle = "Manage payment sources and monthly budgets",
+                onClick = onNavigateToSourceBudget,
+                testTag = "settings_source_budget_row"
             )
 
             Spacer(modifier = Modifier.height(32.dp))

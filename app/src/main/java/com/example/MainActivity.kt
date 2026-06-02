@@ -32,6 +32,8 @@ import com.example.ui.categories.ManageCategoriesScreen
 import com.example.ui.home.HomeScreen
 import com.example.ui.home.HomeViewModel
 import com.example.ui.graph.GraphScreen
+import com.example.ui.budget.BudgetScreen
+import com.example.ui.sourcebudget.SourceBudgetScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.DarkBg
@@ -52,7 +54,7 @@ class MainActivity : ComponentActivity() {
 
         val app = application as ExpenseApp
         val authViewModel: AuthViewModel by viewModels { AuthViewModel.Factory(app.authRepository) }
-        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository) }
+        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository, app.budgetRepository) }
 
         // Handle standard quick save notification intent tasks
         handleNotificationIntents(intent, app)
@@ -107,7 +109,8 @@ class MainActivity : ComponentActivity() {
                                     userName = user.displayName,
                                     userEmail = user.email,
                                     onNavigateToGraph = { navController.navigate("graph") },
-                                    onNavigateToSettings = { navController.navigate("settings") }
+                                    onNavigateToSettings = { navController.navigate("settings") },
+                                    onNavigateToBudget = { navController.navigate("budget") }
                                 )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -128,6 +131,7 @@ class MainActivity : ComponentActivity() {
                                 authViewModel = authViewModel,
                                 onNavigateBack = { navController.popBackStack() },
                                 onNavigateToCategories = { navController.navigate("categories") },
+                                onNavigateToSourceBudget = { navController.navigate("source_budget") },
                                 onSignOut = {
                                     authViewModel.signOut {
                                         navController.navigate("signin") {
@@ -140,6 +144,20 @@ class MainActivity : ComponentActivity() {
 
                         composable("categories") {
                             ManageCategoriesScreen(
+                                viewModel = homeViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable("budget") {
+                            BudgetScreen(
+                                viewModel = homeViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+
+                        composable("source_budget") {
+                            SourceBudgetScreen(
                                 viewModel = homeViewModel,
                                 onNavigateBack = { navController.popBackStack() }
                             )
@@ -217,7 +235,7 @@ class MainActivity : ComponentActivity() {
 
             if (amount > 0.0) {
                 val homeViewModel: HomeViewModel by viewModels {
-                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository)
+                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository, app.budgetRepository)
                 }
                 homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt, paymentSource, expenseId)
 

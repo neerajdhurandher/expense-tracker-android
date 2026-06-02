@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.example.data.database.AppDatabase
 import com.example.data.repo.AuthRepository
+import com.example.data.repo.BudgetRepository
 import com.example.data.repo.CategoryRepository
 import com.example.data.repo.ExpenseRepository
 import com.example.data.repo.PaymentSourceRepository
@@ -30,6 +31,8 @@ class ExpenseApp : Application() {
         private set
     lateinit var paymentSourceRepository: PaymentSourceRepository
         private set
+    lateinit var budgetRepository: BudgetRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -39,6 +42,7 @@ class ExpenseApp : Application() {
         expenseRepository = ExpenseRepository(database.expenseDao())
         categoryRepository = CategoryRepository(database.categoryDao())
         paymentSourceRepository = PaymentSourceRepository(database.paymentSourceDao())
+        budgetRepository = BudgetRepository(database.sourceBudgetDao(), database.expenseDao())
         authRepository = AuthRepository(this)
 
         Log.i(TAG, "Repositories initialized. SmsReceiver registered via manifest.")

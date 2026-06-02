@@ -31,6 +31,7 @@ import com.example.ui.theme.AccentYellow
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.DarkBg
 import com.example.ui.theme.DarkSurface
+import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.LightText
 import com.example.ui.theme.MutedText
 import kotlinx.coroutines.launch
@@ -44,7 +45,8 @@ fun HomeScreen(
     userName: String,
     userEmail: String,
     onNavigateToGraph: (String) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToBudget: () -> Unit
 ) {
     val expenses by viewModel.expensesList.collectAsState()
     val untrackedExpenses by viewModel.untrackedExpenses.collectAsState()
@@ -53,6 +55,7 @@ fun HomeScreen(
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val pendingSmsExpense by viewModel.pendingSmsExpense.collectAsState()
     val historyFilter by viewModel.historyFilter.collectAsState()
+    val budgetSummary by viewModel.budgetSummary.collectAsState()
 
     var showProfileMenu by remember { mutableStateOf(false) }
     var showAddForm by remember { mutableStateOf(false) }
@@ -245,16 +248,27 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // Summary Card
+                // Summary Card (merged with Budget)
                 item(key = "summary_card") {
+                    val summary = budgetSummary
+                    val hasBudget = summary != null && summary.totalBudget > 0 && selectedMonth != null
+
                     Card(
                         shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(containerColor = AccentYellow),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (hasBudget) Modifier
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .clickable { onNavigateToBudget() }
+                                else Modifier
+                            )
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp)
                         ) {
+                            // ── Top: Total Spent + Trend icon ──
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -285,25 +299,105 @@ fun HomeScreen(
                                 )
                             }
 
+                            // ── Budget progress section (only when budget is set) ──
+                            if (hasBudget && summary != null) {
+                                val utilization = summary.utilizationPercent
+                                val budgetProgressColor = when {
+                                    utilization > 1f -> Color(0xFFFF6B6B)
+                                    utilization > 0.8f -> Color(0xFFFCA5A5)
+                                    utilization > 0.6f -> Color(0xFFFDE68A)
+                                    else -> Color.White
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                LinearProgressIndicator(
+                                    progress = { minOf(utilization, 1f) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .testTag("budget_progress_bar"),
+                                    color = budgetProgressColor,
+                                    trackColor = Color.White.copy(alpha = 0.15f),
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "Budget: ₹${String.format(Locale.getDefault(), "%,.0f", summary.totalBudget)}  •  ${String.format(Locale.getDefault(), "%.0f", minOf(utilization * 100, 999f))}% used",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White.copy(alpha = 0.75f)
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(20.dp))
 
                             HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column {
-                                    Text(text = "TRANSACTIONS", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = "$transactionCount txns", fontSize = 15.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            // ── Bottom stats row ──
+                            if (hasBudget && summary != null) {
+                                // 3-column: TRANSACTIONS | TOP CATEGORY | REMAINING
+                                val remainingColor = if (summary.totalRemaining < 0) {
+                                    Color(0xFFFF6B6B)
+                                } else {
+                                    Color.White
                                 }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(text = "TOP CATEGORY", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = topCategory, fontSize = 15.sp, color = Color.White, fontWeight = FontWeight.Bold)
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(text = "TRANSACTIONS", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(text = "$transactionCount txns", fontSize = 15.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(text = "TOP CATEGORY", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(text = topCategory, fontSize = 15.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(text = "REMAINING", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = if (summary.totalRemaining >= 0) "₹${String.format(Locale.getDefault(), "%,.0f", summary.totalRemaining)}"
+                                                else "-₹${String.format(Locale.getDefault(), "%,.0f", -summary.totalRemaining)}",
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = remainingColor
+                                            )
+                                            Spacer(modifier = Modifier.width(2.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.ChevronRight,
+                                                contentDescription = "View budget details",
+                                                tint = Color.White.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                // 2-column: TRANSACTIONS | TOP CATEGORY (original layout)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text(text = "TRANSACTIONS", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(text = "$transactionCount txns", fontSize = 15.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(text = "TOP CATEGORY", fontSize = 10.sp, color = Color.White.copy(alpha = 0.75f), fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(text = topCategory, fontSize = 15.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
