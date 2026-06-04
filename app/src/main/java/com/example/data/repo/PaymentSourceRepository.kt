@@ -2,13 +2,18 @@ package com.example.data.repo
 
 import com.example.data.database.PaymentSourceDao
 import com.example.data.model.PaymentSource
+import com.example.data.model.SyncStatus
+import com.example.data.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class PaymentSourceRepository(private val dao: PaymentSourceDao) {
+class PaymentSourceRepository(
+    private val dao: PaymentSourceDao,
+    private val syncEngine: SyncEngine? = null
+) {
 
     val allPaymentSources: Flow<List<PaymentSource>> = dao.getAllPaymentSources()
 
@@ -31,11 +36,28 @@ class PaymentSourceRepository(private val dao: PaymentSourceDao) {
     }
 
     suspend fun insertPaymentSource(source: PaymentSource) {
-        dao.insertPaymentSource(source)
+        val withSync = source.copy(
+            syncStatus = SyncStatus.PENDING,
+            updatedAt = System.currentTimeMillis()
+        )
+        dao.insertPaymentSource(withSync)
+        tryPush { it.pushPaymentSourceIfOnline(withSync) }
     }
 
     suspend fun deletePaymentSource(source: PaymentSource) {
-        dao.deletePaymentSource(source)
+        val deleted = source.copy(
+            isDeleted = true,
+            syncStatus = SyncStatus.DELETED,
+            updatedAt = System.currentTimeMillis()
+        )
+        dao.insertPaymentSource(deleted) // Upsert with soft delete flag
+        tryPush { it.pushPaymentSourceIfOnline(deleted) }
+    }
+
+    private fun tryPush(action: suspend (SyncEngine) -> Unit) {
+        val engine = syncEngine ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            try { action(engine) } catch (_: Exception) { }
+        }
     }
 }
-

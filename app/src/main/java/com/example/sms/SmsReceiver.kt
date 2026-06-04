@@ -7,11 +7,13 @@ import android.provider.Telephony
 import android.util.Log
 import com.example.data.database.AppDatabase
 import com.example.data.model.Expense
+import com.example.data.model.SyncStatus
 import com.example.notification.ExpenseNotifier
 import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
 class SmsReceiver : BroadcastReceiver() {
     companion object {
@@ -76,7 +78,10 @@ class SmsReceiver : BroadcastReceiver() {
                             createdAt = System.currentTimeMillis(),
                             yearMonth = yearMonthStr,
                             paymentSource = paymentSource,
-                            isTracked = false // Untracked until user acts
+                            isTracked = false, // Untracked until user acts
+                            firestoreId = UUID.randomUUID().toString(),
+                            updatedAt = System.currentTimeMillis(),
+                            syncStatus = SyncStatus.PENDING
                         )
                         val id = runBlocking { db.expenseDao().insertExpenseAndGetId(expense) }
                         Log.i(TAG, "[$index] Expense saved as untracked — ID: $id")

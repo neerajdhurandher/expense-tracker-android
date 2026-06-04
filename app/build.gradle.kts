@@ -4,6 +4,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
+  alias(libs.plugins.google.services)
 }
 
 android {
@@ -93,8 +94,14 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.firestore)
+  implementation(libs.androidx.credentials)
+  implementation(libs.androidx.credentials.play)
+  implementation(libs.google.id.login)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
+  implementation(libs.kotlinx.coroutines.play.services)
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
@@ -118,4 +125,13 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+  implementation(platform("com.google.firebase:firebase-bom:34.14.0"))
+  implementation("com.google.firebase:firebase-analytics")
 }
+
+// Workaround: AGP 9.x removed the 'unitTestClasses' task but the IDE and some plugins
+// still try to resolve it. Register a compatibility alias that delegates to the new task.
+tasks.register("unitTestClasses") {
+  dependsOn(tasks.matching { it.name == "compileDebugUnitTestKotlin" })
+}
+

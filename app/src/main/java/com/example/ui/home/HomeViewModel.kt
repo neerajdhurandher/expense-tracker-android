@@ -12,6 +12,8 @@ import com.example.data.repo.BudgetRepository
 import com.example.data.repo.CategoryRepository
 import com.example.data.repo.ExpenseRepository
 import com.example.data.repo.PaymentSourceRepository
+import com.example.data.sync.SyncEngine
+import com.example.data.sync.SyncState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,8 +36,23 @@ class HomeViewModel(
     private val expenseRepository: ExpenseRepository,
     private val categoryRepository: CategoryRepository,
     private val paymentSourceRepository: PaymentSourceRepository,
-    private val budgetRepository: BudgetRepository
+    private val budgetRepository: BudgetRepository,
+    private val syncEngine: SyncEngine? = null
 ) : ViewModel() {
+
+    // ═══════════════════════════════════════════════════════════════
+    // Sync
+    // ═════════════════���═════════════════════════════════════════════
+
+    val syncState: StateFlow<SyncState> = syncEngine?.syncState
+        ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SyncState.Idle)
+        ?: MutableStateFlow<SyncState>(SyncState.Idle).asStateFlow()
+
+    fun triggerSync() {
+        viewModelScope.launch {
+            syncEngine?.performFullSync()
+        }
+    }
 
     // Generate dynamic list of the last 12 months for dropdown
     val availableMonths: List<YearMonthItem> = createAvailableMonthsList()
@@ -400,12 +417,13 @@ class HomeViewModel(
         private val expenseRepo: ExpenseRepository,
         private val categoryRepo: CategoryRepository,
         private val paymentSourceRepo: PaymentSourceRepository,
-        private val budgetRepo: BudgetRepository
+        private val budgetRepo: BudgetRepository,
+        private val syncEngine: SyncEngine? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
-                return HomeViewModel(expenseRepo, categoryRepo, paymentSourceRepo, budgetRepo) as T
+                return HomeViewModel(expenseRepo, categoryRepo, paymentSourceRepo, budgetRepo, syncEngine) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

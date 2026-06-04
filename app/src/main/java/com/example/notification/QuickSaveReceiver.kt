@@ -7,6 +7,7 @@ import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import com.example.data.database.AppDatabase
+import com.example.data.model.SyncStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -41,6 +42,7 @@ class QuickSaveReceiver : BroadcastReceiver() {
             try {
                 val db = AppDatabase.getDatabase(context)
                 db.expenseDao().markAsTracked(expenseId)
+                db.expenseDao().updateSyncStatus(expenseId, SyncStatus.MODIFIED)
                 val expense = db.expenseDao().getExpenseById(expenseId)
                 Log.i(TAG, "✅ Expense #$expenseId marked as tracked — ₹${expense?.amount} at ${expense?.name}")
 
@@ -71,8 +73,16 @@ class QuickSaveReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val db = AppDatabase.getDatabase(context)
-                db.expenseDao().deleteExpenseById(expenseId)
-                Log.d(TAG, "Skipped & deleted untracked expense #$expenseId")
+                val expense = db.expenseDao().getExpenseById(expenseId)
+                if (expense != null) {
+                    val deleted = expense.copy(
+                        isDeleted = true,
+                        syncStatus = SyncStatus.DELETED,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    db.expenseDao().updateExpense(deleted)
+                }
+                Log.d(TAG, "Skipped & soft-deleted untracked expense #$expenseId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to delete skipped expense #$expenseId", e)
             } finally {

@@ -8,6 +8,9 @@ import com.example.data.repo.BudgetRepository
 import com.example.data.repo.CategoryRepository
 import com.example.data.repo.ExpenseRepository
 import com.example.data.repo.PaymentSourceRepository
+import com.example.data.sync.ConnectivityMonitor
+import com.example.data.sync.SyncEngine
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,19 +36,47 @@ class ExpenseApp : Application() {
         private set
     lateinit var budgetRepository: BudgetRepository
         private set
+    lateinit var syncEngine: SyncEngine
+        private set
+    lateinit var connectivityMonitor: ConnectivityMonitor
+        private set
 
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "══════ ExpenseApp started ══════")
 
         database = AppDatabase.getDatabase(this)
-        expenseRepository = ExpenseRepository(database.expenseDao())
-        categoryRepository = CategoryRepository(database.categoryDao())
-        paymentSourceRepository = PaymentSourceRepository(database.paymentSourceDao())
-        budgetRepository = BudgetRepository(database.sourceBudgetDao(), database.expenseDao())
         authRepository = AuthRepository(this)
 
-        Log.i(TAG, "Repositories initialized. SmsReceiver registered via manifest.")
+        // Initialize sync infrastructure
+        connectivityMonitor = ConnectivityMonitor(this)
+        connectivityMonitor.startMonitoring()
+
+        syncEngine = SyncEngine(
+            firestore = FirebaseFirestore.getInstance(),
+            expenseDao = database.expenseDao(),
+            categoryDao = database.categoryDao(),
+            paymentSourceDao = database.paymentSourceDao(),
+            sourceBudgetDao = database.sourceBudgetDao()
+        )
+
+        // Initialize repositories with SyncEngine
+        expenseRepository = ExpenseRepository(database.expenseDao(), syncEngine)
+        categoryRepository = CategoryRepository(database.categoryDao(), syncEngine)
+        paymentSourceRepository = PaymentSourceRepository(database.paymentSourceDao(), syncEngine)
+        budgetRepository = BudgetRepository(database.sourceBudgetDao(), database.expenseDao(), syncEngine)
+
+        Log.i(TAG, "Repositories initialized with SyncEngine. SmsReceiver registered via manifest.")
+
+        // Auto-sync when connectivity is restored
+        appScope.launch {
+            connectivityMonitor.isOnline.collect { online ->
+                if (online && authRepository.currentUser.value != null) {
+                    Log.i(TAG, "Network restored — triggering sync")
+                    syncEngine.performFullSync()
+                }
+            }
+        }
 
         // Heartbeat logger — logs every 1 minute to confirm process is alive
         startHeartbeatLogger()

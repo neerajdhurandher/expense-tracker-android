@@ -11,7 +11,7 @@ import com.example.data.model.Expense
 import com.example.data.model.PaymentSource
 import com.example.data.model.SourceBudget
 
-@Database(entities = [Expense::class, Category::class, PaymentSource::class, SourceBudget::class], version = 4, exportSchema = false)
+@Database(entities = [Expense::class, Category::class, PaymentSource::class, SourceBudget::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun categoryDao(): CategoryDao
@@ -58,6 +58,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Expenses — add sync columns
+                db.execSQL("ALTER TABLE expenses ADD COLUMN firestoreId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE expenses ADD COLUMN syncStatus INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("UPDATE expenses SET firestoreId = hex(randomblob(16)) WHERE firestoreId = ''")
+                db.execSQL("UPDATE expenses SET updatedAt = createdAt WHERE updatedAt = 0")
+
+                // Categories — add sync columns
+                db.execSQL("ALTER TABLE categories ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE categories ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE categories ADD COLUMN syncStatus INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("UPDATE categories SET updatedAt = createdAt WHERE updatedAt = 0")
+
+                // Payment Sources — add sync columns
+                db.execSQL("ALTER TABLE payment_sources ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE payment_sources ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE payment_sources ADD COLUMN syncStatus INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("UPDATE payment_sources SET updatedAt = createdAt WHERE updatedAt = 0")
+
+                // Source Budgets — add sync columns
+                db.execSQL("ALTER TABLE source_budgets ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE source_budgets ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE source_budgets ADD COLUMN syncStatus INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("UPDATE source_budgets SET updatedAt = createdAt WHERE updatedAt = 0")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -65,7 +95,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "expense_tracker_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

@@ -1,6 +1,5 @@
 package com.example.ui.settings
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,28 +19,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.data.sync.SyncState
 import com.example.ui.auth.AuthViewModel
+import com.example.ui.home.HomeViewModel
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     authViewModel: AuthViewModel,
+    homeViewModel: HomeViewModel,
+    isOnline: Boolean,
     onNavigateBack: () -> Unit,
     onNavigateToCategories: () -> Unit,
     onNavigateToSourceBudget: () -> Unit,
     onSignOut: () -> Unit
 ) {
     val currentUser by authViewModel.currentUser.collectAsState()
-    val context = LocalContext.current
-
-    var isEditingProfile by remember { mutableStateOf(false) }
-    var editName by remember(currentUser) { mutableStateOf(currentUser?.displayName ?: "") }
+    val syncState by homeViewModel.syncState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -79,7 +80,7 @@ fun SettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── Profile Card ──
+            // ── Profile Card (read-only  data from Google) ──
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -93,11 +94,20 @@ fun SettingsScreen(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Avatar
+                        // Avatar — use Google photo if available
+                        if (currentUser?.photoUrl != null) {
+                            AsyncImage(
+                                model = currentUser?.photoUrl,
+                                contentDescription = "Profile photo",
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, AccentYellow, CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
                             Box(
                                 modifier = Modifier
                                     .size(56.dp)
@@ -112,122 +122,128 @@ fun SettingsScreen(
                                     fontSize = 22.sp
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            // Name & email
-                            Column {
-                                Text(
-                                    text = currentUser?.displayName ?: "User",
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = LightText
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = currentUser?.email ?: "",
-                                    fontSize = 13.sp,
-                                    color = MutedText
-                                )
-                            }
                         }
 
-                        // Edit toggle button
-                        if (!isEditingProfile) {
-                            IconButton(
-                                onClick = {
-                                    editName = currentUser?.displayName ?: ""
-                                    isEditingProfile = true
-                                },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(AccentYellow.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
-                                    .testTag("profile_edit_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit profile",
-                                    tint = AccentYellow,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Name & email
+                        Column {
+                            Text(
+                                text = currentUser?.displayName ?: "User",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = LightText
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = currentUser?.email ?: "",
+                                fontSize = 13.sp,
+                                color = MutedText
+                            )
                         }
                     }
+                }
+            }
 
-                    // Edit form — expands below profile info
-                    if (isEditingProfile) {
-                        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-                        HorizontalDivider(color = CardBorder)
+            // ── Section: Cloud Sync ──
+            Text(
+                text = "CLOUD SYNC",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MutedText,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
+            )
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        OutlinedTextField(
-                            value = editName,
-                            onValueChange = { editName = it },
-                            label = { Text("Display Name") },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AccentYellow,
-                                focusedLabelColor = AccentYellow,
-                                cursorColor = AccentYellow,
-                                unfocusedBorderColor = MutedText.copy(alpha = 0.5f),
-                                unfocusedTextColor = LightText,
-                                focusedTextColor = LightText
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("profile_name_input"),
-                            shape = RoundedCornerShape(12.dp)
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    // Connection status
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = if (isOnline) Icons.Default.Cloud else Icons.Default.CloudOff,
+                            contentDescription = "Connection status",
+                            tint = if (isOnline) Color(0xFF22C55E) else Color(0xFFF59E0B),
+                            modifier = Modifier.size(20.dp)
                         )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = if (isOnline) "Connected" else "Offline",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = LightText
+                        )
+                    }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { isEditingProfile = false },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MutedText),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .testTag("profile_cancel_button")
-                            ) {
-                                Text("Cancel", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
+                    // Sync status
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Sync status",
+                            tint = when (syncState) {
+                                is SyncState.Syncing -> AccentYellow
+                                is SyncState.Success -> Color(0xFF22C55E)
+                                is SyncState.Error -> ErrorRed
+                                else -> MutedText
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = when (syncState) {
+                                is SyncState.Idle -> "Sync idle"
+                                is SyncState.Syncing -> "Syncing..."
+                                is SyncState.Success -> "Synced"
+                                is SyncState.Error -> "Sync error: ${(syncState as SyncState.Error).message}"
+                            },
+                            fontSize = 14.sp,
+                            color = MutedText
+                        )
+                    }
 
-                            Button(
-                                onClick = {
-                                    val trimmed = editName.trim()
-                                    if (trimmed.isEmpty()) {
-                                        Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
-                                        return@Button
-                                    }
-                                    authViewModel.updateProfile(trimmed) { result ->
-                                        if (result.isSuccess) {
-                                            isEditingProfile = false
-                                            Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Failed to update profile", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = AccentYellow,
-                                    contentColor = Color.White
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp)
-                                    .testTag("profile_save_button")
-                            ) {
-                                Text("Save", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Sync now button
+                    Button(
+                        onClick = { homeViewModel.triggerSync() },
+                        enabled = isOnline && syncState !is SyncState.Syncing,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccentYellow,
+                            contentColor = Color.White,
+                            disabledContainerColor = MutedText.copy(alpha = 0.2f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .testTag("sync_now_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (syncState is SyncState.Syncing) "Syncing..." else "Sync Now",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }

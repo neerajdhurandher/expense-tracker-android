@@ -9,6 +9,10 @@ data class PaymentSource(
     val color: String, // Hex code (e.g. "#4DABF7")
     val smartKeywords: String = "", // Comma-separated SMS detection keywords
     val isCustom: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Sync fields
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    val syncStatus: Int = SyncStatus.PENDING
 )
 

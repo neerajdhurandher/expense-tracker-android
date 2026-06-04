@@ -2,20 +2,24 @@ package com.example.data.repo
 
 import com.example.data.database.CategoryDao
 import com.example.data.model.Category
+import com.example.data.model.SyncStatus
+import com.example.data.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-class CategoryRepository(private val categoryDao: CategoryDao) {
+class CategoryRepository(
+    private val categoryDao: CategoryDao,
+    private val syncEngine: SyncEngine? = null
+) {
 
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Note: using first() on Room flow retrieves the current snapshot
                 val current = categoryDao.getAllCategories().first()
                 if (current.isEmpty()) {
                     val defaults = listOf(
@@ -37,10 +41,28 @@ class CategoryRepository(private val categoryDao: CategoryDao) {
     }
 
     suspend fun insertCategory(category: Category) {
-        categoryDao.insertCategory(category)
+        val withSync = category.copy(
+            syncStatus = SyncStatus.PENDING,
+            updatedAt = System.currentTimeMillis()
+        )
+        categoryDao.insertCategory(withSync)
+        tryPush { it.pushCategoryIfOnline(withSync) }
     }
 
     suspend fun deleteCategory(category: Category) {
-        categoryDao.deleteCategory(category)
+        val deleted = category.copy(
+            isDeleted = true,
+            syncStatus = SyncStatus.DELETED,
+            updatedAt = System.currentTimeMillis()
+        )
+        categoryDao.insertCategory(deleted) // Upsert with soft delete flag
+        tryPush { it.pushCategoryIfOnline(deleted) }
+    }
+
+    private fun tryPush(action: suspend (SyncEngine) -> Unit) {
+        val engine = syncEngine ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            try { action(engine) } catch (_: Exception) { }
+        }
     }
 }
