@@ -94,4 +94,14 @@ interface ExpenseDao {
 
     @Query("DELETE FROM expenses WHERE firestoreId = :firestoreId")
     suspend fun hardDeleteByFirestoreId(firestoreId: String)
+
+    // ═══════════════════════════════════════════════════════════════
+    // Export queries (one-shot, suspend)
+    // ═══════════════════════════════════════════════════════════════
+
+    @Query("SELECT * FROM expenses WHERE yearMonth = :yearMonth AND isTracked = 1 AND isDeleted = 0 ORDER BY occurredAt DESC")
+    suspend fun getTrackedExpensesByMonthList(yearMonth: String): List<Expense>
+
+    @Query("SELECT * FROM expenses WHERE occurredAt >= :fromTs AND occurredAt <= :toTs AND isTracked = 1 AND isDeleted = 0 ORDER BY occurredAt DESC")
+    suspend fun getTrackedExpensesInDateRange(fromTs: Long, toTs: Long): List<Expense>
 }

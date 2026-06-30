@@ -14,6 +14,10 @@ import com.example.data.repo.ExpenseRepository
 import com.example.data.repo.PaymentSourceRepository
 import com.example.data.sync.SyncEngine
 import com.example.data.sync.SyncState
+import com.example.data.export.ExportConfig
+import com.example.data.export.ExportDateRange
+import com.example.data.export.ExportResult
+import com.example.data.export.ExpenseExportService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -52,6 +56,47 @@ class HomeViewModel(
         viewModelScope.launch {
             syncEngine?.performFullSync()
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Export
+    // ═══════════════════════════════════════════════════════════════
+
+    sealed class ExportState {
+        data object Idle : ExportState()
+        data object Loading : ExportState()
+        data class Success(val result: ExportResult) : ExportState()
+        data class Error(val message: String) : ExportState()
+    }
+
+    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+    val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
+
+    fun startExport(config: ExportConfig) {
+        viewModelScope.launch {
+            _exportState.value = ExportState.Loading
+            try {
+                val expenses = when (config.dateRange) {
+                    is ExportDateRange.CurrentMonth -> {
+                        val yearMonth = _selectedMonth.value?.queryValue ?: currentYearMonth
+                        expenseRepository.getTrackedExpensesByMonthList(yearMonth)
+                    }
+                    else -> {
+                        val (from, to) = config.dateRange.toTimestampRange()
+                        expenseRepository.getTrackedExpensesInDateRange(from, to)
+                    }
+                }
+                val periodLabel = config.dateRange.toPeriodLabel(_selectedMonth.value)
+                val result = ExpenseExportService.generateCsv(expenses, config, periodLabel)
+                _exportState.value = ExportState.Success(result)
+            } catch (e: Exception) {
+                _exportState.value = ExportState.Error(e.message ?: "Export failed")
+            }
+        }
+    }
+
+    fun clearExportState() {
+        _exportState.value = ExportState.Idle
     }
 
     // Generate dynamic list of the last 12 months for dropdown

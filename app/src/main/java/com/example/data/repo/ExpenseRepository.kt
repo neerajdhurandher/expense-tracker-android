@@ -80,6 +80,12 @@ class ExpenseRepository(
         return expenseDao.getExpenseById(id)
     }
 
+    suspend fun getTrackedExpensesByMonthList(yearMonth: String): List<Expense> =
+        expenseDao.getTrackedExpensesByMonthList(yearMonth)
+
+    suspend fun getTrackedExpensesInDateRange(fromTs: Long, toTs: Long): List<Expense> =
+        expenseDao.getTrackedExpensesInDateRange(fromTs, toTs)
+
     suspend fun markAsTracked(id: Long) {
         expenseDao.markAsTracked(id)
         val expense = expenseDao.getExpenseById(id)
