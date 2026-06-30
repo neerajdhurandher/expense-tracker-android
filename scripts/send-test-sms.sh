@@ -135,13 +135,16 @@ PRESETS_BODY[shopping]="ICICI Bank Acct XX123 debited INR 2499.00 on 31-May-26; 
 PRESETS_SENDER[health]="BZ-PHONEPE"
 PRESETS_BODY[health]="Payment of Rs 672.00 to APOLLO PHARMACY successful via PhonePe UPI on 31-May-2026. TxnID: PPE789456123"
 
+PRESETS_SENDER[swiggy]="VK-HDFCBK"
+PRESETS_BODY[swiggy]="HDFC Credit Card XXXX5678 debited Rs 549.50 at SWIGGY on 31-May-2026. Ref: HCC123456789. For support call 1860 180 1111"
+
 # Handle presets
 if [ -n "$PRESET" ]; then
     if [ "$PRESET" == "all" ]; then
         echo -e "${YELLOW}Sending ALL preset test SMS messages...${NC}"
         echo -e "${GRAY}   (3 second delay between each)${NC}"
 
-        for key in hdfc sbi icici paytm gpay credit refund grocery bill shopping health; do
+        for key in hdfc sbi icici paytm gpay credit refund grocery bill shopping health swiggy; do
             echo ""
             echo -e "${YELLOW}--- [$key] ---${NC}"
             send_sms "${PRESETS_SENDER[$key]}" "${PRESETS_BODY[$key]}"
@@ -149,14 +152,14 @@ if [ -n "$PRESET" ]; then
         done
 
         echo ""
-        echo -e "${GREEN}All 11 test SMS sent!${NC}"
+        echo -e "${GREEN}All 12 test SMS sent!${NC}"
         exit 0
     elif [ -n "${PRESETS_SENDER[$PRESET]}" ]; then
         send_sms "${PRESETS_SENDER[$PRESET]}" "${PRESETS_BODY[$PRESET]}"
         exit 0
     else
         echo -e "${RED}Unknown preset: '$PRESET'${NC}"
-        echo -e "${GRAY}   Available: hdfc, sbi, icici, paytm, gpay, credit, refund, grocery, bill, shopping, health${NC}"
+        echo -e "${GRAY}   Available: hdfc, sbi, icici, paytm, gpay, credit, refund, grocery, bill, shopping, health, swiggy${NC}"
         exit 1
     fi
 fi
