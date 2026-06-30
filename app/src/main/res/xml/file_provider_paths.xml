@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Allows sharing files written to context.cacheDir — no storage permission needed -->
+    <cache-path name="exported_reports" path="." />
+</paths>
+

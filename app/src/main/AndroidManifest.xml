@@ -58,6 +58,17 @@
             android:name=".notification.QuickSaveReceiver"
             android:exported="false" />
 
+        <!-- FileProvider for sharing exported CSV reports via cache dir -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
     </application>
 
 </manifest>

@@ -8,5 +8,9 @@ data class Category(
     @PrimaryKey val name: String,
     val color: String, // Hex code (e.g. "#FFE600")
     val isCustom: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Sync fields
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    val syncStatus: Int = SyncStatus.PENDING
 )

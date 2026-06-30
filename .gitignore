@@ -45,6 +45,7 @@ my-upload-key.jks
 # Environment / secrets
 .env
 google-services.json
+app/data.txt
 /.idea/codeStyles/codeStyleConfig.xml
 /.idea/codeStyles/Project.xml
 /.idea/.gitignore

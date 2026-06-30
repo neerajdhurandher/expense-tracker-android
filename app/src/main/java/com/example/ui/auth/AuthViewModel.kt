@@ -1,5 +1,6 @@
 package com.example.ui.auth
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -12,16 +13,13 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     val currentUser: StateFlow<User?> = authRepository.currentUser
 
-    fun signInWithGoogle(email: String, name: String, photoUrl: String?, onResult: (Result<User>) -> Unit) {
+    /**
+     * Trigger Google Sign-In flow using Credential Manager.
+     * [activityContext] is required for the Credential Manager to show the Google account picker.
+     */
+    fun signInWithGoogle(activityContext: Context, onResult: (Result<User>) -> Unit) {
         viewModelScope.launch {
-            val result = authRepository.signIn(email, name, photoUrl)
-            onResult(result)
-        }
-    }
-
-    fun updateProfile(displayName: String, photoUrl: String? = null, onResult: (Result<User>) -> Unit = {}) {
-        viewModelScope.launch {
-            val result = authRepository.updateProfile(displayName, photoUrl)
+            val result = authRepository.signInWithGoogle(activityContext)
             onResult(result)
         }
     }

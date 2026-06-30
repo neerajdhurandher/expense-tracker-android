@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Category
@@ -853,7 +854,7 @@ fun UntrackedExpenseItem(
                             Icon(
                                 imageVector = when (expense.category) {
                                     "Food" -> Icons.Default.LunchDining
-                                    "Travel" -> Icons.Default.DirectionsRun
+                                    "Travel" -> Icons.Default.DirectionsCar
                                     "Groceries" -> Icons.Default.ShoppingBasket
                                     "Shopping" -> Icons.Default.LocalMall
                                     "Bills" -> Icons.Default.FlashOn
@@ -1085,7 +1086,7 @@ fun ExpenseItemRow(
                         Icon(
                             imageVector = when (expense.category) {
                                 "Food" -> Icons.Default.LunchDining
-                                "Travel" -> Icons.Default.DirectionsRun
+                                "Travel" -> Icons.Default.DirectionsCar
                                 "Groceries" -> Icons.Default.ShoppingBasket
                                 "Shopping" -> Icons.Default.LocalMall
                                 "Bills" -> Icons.Default.FlashOn
@@ -1109,12 +1110,17 @@ fun ExpenseItemRow(
                             color = LightText
                         )
                         Spacer(modifier = Modifier.height(2.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
                                 text = expense.category,
                                 fontSize = 11.sp,
                                 color = categoryColor,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = " • ",
@@ -1126,7 +1132,9 @@ fun ExpenseItemRow(
                                 text = expense.paymentSource,
                                 fontSize = 11.sp,
                                 color = Color(android.graphics.Color.parseColor(sourceColorHex)),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = " • ",
@@ -1137,7 +1145,10 @@ fun ExpenseItemRow(
                             Text(
                                 text = sdf.format(Date(expense.occurredAt)),
                                 fontSize = 11.sp,
-                                color = MutedText
+                                color = MutedText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }

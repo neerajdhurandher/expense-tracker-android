@@ -54,7 +54,15 @@ class MainActivity : ComponentActivity() {
 
         val app = application as ExpenseApp
         val authViewModel: AuthViewModel by viewModels { AuthViewModel.Factory(app.authRepository) }
-        val homeViewModel: HomeViewModel by viewModels { HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository, app.budgetRepository) }
+        val homeViewModel: HomeViewModel by viewModels {
+            HomeViewModel.Factory(
+                app.expenseRepository,
+                app.categoryRepository,
+                app.paymentSourceRepository,
+                app.budgetRepository,
+                app.syncEngine
+            )
+        }
 
         // Handle standard quick save notification intent tasks
         handleNotificationIntents(intent, app)
@@ -76,6 +84,8 @@ class MainActivity : ComponentActivity() {
                         navController.navigate("home") {
                             popUpTo(0) { inclusive = true }
                         }
+                        // Trigger initial sync after sign-in
+                        homeViewModel.triggerSync()
                     }
                 }
 
@@ -129,10 +139,17 @@ class MainActivity : ComponentActivity() {
                         composable("settings") {
                             SettingsScreen(
                                 authViewModel = authViewModel,
+                                homeViewModel = homeViewModel,
+                                isOnline = app.connectivityMonitor.isOnline.collectAsState().value,
                                 onNavigateBack = { navController.popBackStack() },
                                 onNavigateToCategories = { navController.navigate("categories") },
                                 onNavigateToSourceBudget = { navController.navigate("source_budget") },
                                 onSignOut = {
+                                    // Push pending changes before sign out
+                                    lifecycleScope.launch {
+                                        try { app.syncEngine.performFullSync() } catch (_: Exception) {}
+                                        app.database.clearAllTables()
+                                    }
                                     authViewModel.signOut {
                                         navController.navigate("signin") {
                                             popUpTo(0) { inclusive = true }
@@ -235,7 +252,13 @@ class MainActivity : ComponentActivity() {
 
             if (amount > 0.0) {
                 val homeViewModel: HomeViewModel by viewModels {
-                    HomeViewModel.Factory(app.expenseRepository, app.categoryRepository, app.paymentSourceRepository, app.budgetRepository)
+                    HomeViewModel.Factory(
+                        app.expenseRepository,
+                        app.categoryRepository,
+                        app.paymentSourceRepository,
+                        app.budgetRepository,
+                        app.syncEngine
+                    )
                 }
                 homeViewModel.setPendingSmsExpense(merchant, amount, category, rawSms, sender, occurredAt, paymentSource, expenseId)
 

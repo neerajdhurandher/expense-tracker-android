@@ -4,14 +4,20 @@ import com.example.data.database.ExpenseDao
 import com.example.data.database.SourceBudgetDao
 import com.example.data.model.SourceBudget
 import com.example.data.model.SourceSpending
+import com.example.data.model.SyncStatus
+import com.example.data.sync.SyncEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 class BudgetRepository(
     private val budgetDao: SourceBudgetDao,
-    private val expenseDao: ExpenseDao
+    private val expenseDao: ExpenseDao,
+    private val syncEngine: SyncEngine? = null
 ) {
     /** Get budgets for a month as Flow */
     fun getBudgetsByMonth(yearMonth: String): Flow<List<SourceBudget>> {
@@ -31,9 +37,12 @@ class BudgetRepository(
             yearMonth = yearMonth,
             amount = amount,
             carryOver = carryOver,
-            createdAt = existing?.createdAt ?: System.currentTimeMillis()
+            createdAt = existing?.createdAt ?: System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis(),
+            syncStatus = SyncStatus.PENDING
         )
         budgetDao.upsertBudget(budget)
+        tryPush { it.pushBudgetIfOnline(budget) }
     }
 
     /** Copy budgets from one month to another */
@@ -47,10 +56,16 @@ class BudgetRepository(
                 yearMonth = toYearMonth,
                 amount = budget.amount,
                 carryOver = budget.carryOver,
-                createdAt = System.currentTimeMillis()
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                syncStatus = SyncStatus.PENDING
             )
         }
         budgetDao.upsertBudgets(copiedBudgets)
+        // Push each new budget
+        for (b in copiedBudgets) {
+            tryPush { it.pushBudgetIfOnline(b) }
+        }
     }
 
     /**
@@ -74,7 +89,18 @@ class BudgetRepository(
 
     /** Delete a budget */
     suspend fun deleteBudget(sourceName: String, yearMonth: String) {
-        budgetDao.deleteBudget(sourceName, yearMonth)
+        val existing = budgetDao.getBudget(sourceName, yearMonth)
+        if (existing != null) {
+            val deleted = existing.copy(
+                isDeleted = true,
+                syncStatus = SyncStatus.DELETED,
+                updatedAt = System.currentTimeMillis()
+            )
+            budgetDao.upsertBudget(deleted)
+            tryPush { it.pushBudgetIfOnline(deleted) }
+        } else {
+            budgetDao.deleteBudget(sourceName, yearMonth)
+        }
     }
 
     /** Calculate previous month string from "yyyy-MM" format */
@@ -90,5 +116,11 @@ class BudgetRepository(
     fun getPreviousMonth(yearMonth: String): String {
         return calculatePreviousMonth(yearMonth)
     }
-}
 
+    private fun tryPush(action: suspend (SyncEngine) -> Unit) {
+        val engine = syncEngine ?: return
+        CoroutineScope(Dispatchers.IO).launch {
+            try { action(engine) } catch (_: Exception) { }
+        }
+    }
+}

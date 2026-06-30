@@ -1,5 +1,7 @@
 package com.example.ui.graph
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -13,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,11 +24,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.export.ExportResult
 import com.example.ui.home.HomeViewModel
 import com.example.data.model.BudgetSummary
 import com.example.ui.theme.AccentYellow
@@ -35,6 +40,7 @@ import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.LightText
 import com.example.ui.theme.MutedText
+import kotlinx.coroutines.launch
 import java.util.*
 
 data class CategoryShare(
@@ -55,6 +61,51 @@ fun GraphScreen(
     val paymentSources by viewModel.paymentSources.collectAsState()
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val budgetSummary by viewModel.budgetSummary.collectAsState()
+    val exportState by viewModel.exportState.collectAsState()
+
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val uiScope = rememberCoroutineScope()
+    var showExportSheet by remember { mutableStateOf(false) }
+    var pendingExportResult by remember { mutableStateOf<ExportResult?>(null) }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val result = pendingExportResult
+        pendingExportResult = null
+
+        if (result == null) return@rememberLauncherForActivityResult
+
+        if (uri == null) {
+            // User cancelled save dialog.
+            return@rememberLauncherForActivityResult
+        }
+
+        val saved = saveExportCsvToUri(context, uri, result)
+        uiScope.launch {
+            snackbarHostState.showSnackbar(
+                if (saved) "CSV saved to selected location" else "Failed to save CSV"
+            )
+        }
+    }
+
+    // Handle export state changes
+    LaunchedEffect(exportState) {
+        when (val state = exportState) {
+            is HomeViewModel.ExportState.Success -> {
+                showExportSheet = false
+                pendingExportResult = state.result
+                createDocumentLauncher.launch(state.result.fileName)
+                viewModel.clearExportState()
+            }
+            is HomeViewModel.ExportState.Error -> {
+                snackbarHostState.showSnackbar("Export failed: ${state.message}")
+                viewModel.clearExportState()
+            }
+            else -> Unit
+        }
+    }
 
     var viewMode by remember { mutableIntStateOf(0) } // 0 = Category, 1 = Source, 2 = Budget
 
@@ -112,9 +163,22 @@ fun GraphScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { showExportSheet = true },
+                        modifier = Modifier.testTag("export_button_graph")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = "Export expenses",
+                            tint = LightText
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBg)
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = DarkBg
     ) { innerPadding ->
         Column(
@@ -265,6 +329,18 @@ fun GraphScreen(
                 }
             }
         }
+    }
+
+    // ── Export options sheet ──────────────────────────────────────────────────
+    if (showExportSheet) {
+        ExportOptionsSheet(
+            exportState = exportState,
+            onExport = { config -> viewModel.startExport(config) },
+            onDismiss = {
+                showExportSheet = false
+                viewModel.clearExportState()
+            }
+        )
     }
 }
 
