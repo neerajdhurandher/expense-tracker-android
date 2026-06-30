@@ -52,6 +52,15 @@ class SmsParserTest {
     }
 
     @Test
+    fun testPhonePePayment() {
+        val sms = "Payment of Rs 672.00 to APOLLO PHARMACY successful via PhonePe UPI on 01-Jun-2026. TxnID: PPE789456123"
+        val parsed = SmsParser.parse(sms, "BZ-PHONEPE")
+        assertNotNull(parsed)
+        assertEquals(672.0, parsed!!.amount, 0.001)
+        assertEquals("APOLLO PHARMACY", parsed.merchant)
+    }
+
+    @Test
     fun testCreditAndRefundIgnored() {
         val creditSms = "Rs 5000.00 credited to your a/c XX1234 on 28-05-26 by NEFT. Ref: SALARY-MAY"
         assertNull(SmsParser.parse(creditSms, "HDFCBK"))

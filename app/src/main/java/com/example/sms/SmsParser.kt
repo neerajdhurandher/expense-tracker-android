@@ -8,7 +8,10 @@ import java.util.regex.Pattern
 object SmsParser {
 
     private val EXCLUDE_KEYWORDS = listOf("credited", "received", "refund", "reversed", "salary")
-    private val INCLUDE_KEYWORDS = listOf("debited", "spent", "paid", "purchase of", "txn of", "sent")
+    private val INCLUDE_KEYWORDS = listOf(
+        "debited", "spent", "paid", "purchase of", "txn of", "sent",
+        "payment", "successful", "transaction", "deducted", "withdrawn", "transferred"
+    )
 
     private val AMOUNT_PATTERN = Pattern.compile("(?i)(?:INR|Rs\\.?|₹)\\s?([0-9,]+(?:\\.[0-9]{1,2})?)")
 

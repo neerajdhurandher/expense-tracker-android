@@ -854,7 +854,7 @@ fun UntrackedExpenseItem(
                             Icon(
                                 imageVector = when (expense.category) {
                                     "Food" -> Icons.Default.LunchDining
-                                    "Travel" -> Icons.Default.DirectionsRun
+                                    "Travel" -> Icons.Default.DirectionsCar
                                     "Groceries" -> Icons.Default.ShoppingBasket
                                     "Shopping" -> Icons.Default.LocalMall
                                     "Bills" -> Icons.Default.FlashOn
@@ -1086,7 +1086,7 @@ fun ExpenseItemRow(
                         Icon(
                             imageVector = when (expense.category) {
                                 "Food" -> Icons.Default.LunchDining
-                                "Travel" -> Icons.Default.DirectionsRun
+                                "Travel" -> Icons.Default.DirectionsCar
                                 "Groceries" -> Icons.Default.ShoppingBasket
                                 "Shopping" -> Icons.Default.LocalMall
                                 "Bills" -> Icons.Default.FlashOn
