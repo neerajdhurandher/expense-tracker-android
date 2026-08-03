@@ -158,8 +158,8 @@ class HomeViewModel(
             initialValue = emptyList()
         )
 
-    // Keeps track of the last deleted item for Undo action
-    private var recentlyDeletedExpense: Expense? = null
+    // Keeps track of the last delete batch for Undo action (single or bulk)
+    private var recentlyDeletedExpenses: List<Expense> = emptyList()
 
     // Current month in "YYYY-MM" format for edit eligibility check
     private val currentYearMonth: String = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
@@ -335,7 +335,7 @@ class HomeViewModel(
 
     fun dismissUntrackedExpense(expense: Expense) {
         viewModelScope.launch {
-            recentlyDeletedExpense = expense
+            recentlyDeletedExpenses = listOf(expense)
             expenseRepository.deleteExpenseById(expense.id)
         }
     }
@@ -391,16 +391,29 @@ class HomeViewModel(
 
     fun deleteExpense(expense: Expense) {
         viewModelScope.launch {
-            recentlyDeletedExpense = expense
+            recentlyDeletedExpenses = listOf(expense)
             expenseRepository.deleteExpenseById(expense.id)
         }
     }
 
-    fun undoDeleteExpense() {
-        val expenseToRestore = recentlyDeletedExpense ?: return
+    fun deleteExpenses(expenses: List<Expense>) {
+        if (expenses.isEmpty()) return
         viewModelScope.launch {
-            expenseRepository.insertExpense(expenseToRestore)
-            recentlyDeletedExpense = null
+            recentlyDeletedExpenses = expenses
+            expenses.forEach { expense ->
+                expenseRepository.deleteExpenseById(expense.id)
+            }
+        }
+    }
+
+    fun undoDeleteExpense() {
+        val expensesToRestore = recentlyDeletedExpenses
+        if (expensesToRestore.isEmpty()) return
+        viewModelScope.launch {
+            expensesToRestore.forEach { expense ->
+                expenseRepository.insertExpense(expense)
+            }
+            recentlyDeletedExpenses = emptyList()
         }
     }
 

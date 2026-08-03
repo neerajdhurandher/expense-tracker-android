@@ -2,6 +2,8 @@
     <string name="app_name">Expense Tracker</string>
     <string name="default_web_client_id">46616115122-bhc5mm2i1dlg5q741ao8pp1ip8u3pvv7.apps.googleusercontent.com</string>
     <string name="widget_title_expenses">Expenses</string>
+    <string name="widget_title_expenses_today">Today\'s Expenses</string>
+    <string name="widget_title_expenses_month">This Month\'s Expenses</string>
     <string name="widget_interval_today">Today</string>
     <string name="widget_interval_week">This Week</string>
     <string name="widget_interval_month">This Month</string>

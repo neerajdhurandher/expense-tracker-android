@@ -69,6 +69,30 @@
                 android:resource="@xml/expense_summary_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.TodayExpenseWidgetProvider"
+            android:label="@string/widget_title_expenses_today"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/expense_summary_today_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MonthExpenseWidgetProvider"
+            android:label="@string/widget_title_expenses_month"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/expense_summary_month_widget_info" />
+        </receiver>
+
         <!-- FileProvider for sharing exported CSV reports via cache dir -->
         <provider
             android:name="androidx.core.content.FileProvider"

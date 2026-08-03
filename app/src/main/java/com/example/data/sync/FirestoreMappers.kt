@@ -6,7 +6,9 @@ import com.example.data.model.PaymentSource
 import com.example.data.model.SourceBudget
 import com.example.data.model.SyncStatus
 import com.google.firebase.firestore.DocumentSnapshot
-import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ═══════════════════════════════════════════════════════════════
 // Expense ↔ Firestore
@@ -22,6 +24,7 @@ fun Expense.toFirestoreMap(): Map<String, Any?> = mapOf(
     "sender" to sender,
     "occurredAt" to occurredAt,
     "createdAt" to createdAt,
+    "createdAtLocalTime" to createdAtLocalTime,
     "updatedAt" to updatedAt,
     "yearMonth" to yearMonth,
     "paymentSource" to paymentSource,
@@ -43,6 +46,8 @@ fun DocumentSnapshot.toExpense(): Expense? {
             sender = getString("sender"),
             occurredAt = getLong("occurredAt") ?: System.currentTimeMillis(),
             createdAt = getLong("createdAt") ?: System.currentTimeMillis(),
+            createdAtLocalTime = getString("createdAtLocalTime")
+                ?: formatLocalDateTime(getLong("createdAt") ?: System.currentTimeMillis()),
             updatedAt = getLong("updatedAt") ?: System.currentTimeMillis(),
             yearMonth = getString("yearMonth") ?: "",
             paymentSource = getString("paymentSource") ?: "UPI",
@@ -53,6 +58,11 @@ fun DocumentSnapshot.toExpense(): Expense? {
     } catch (e: Exception) {
         null
     }
+}
+
+private fun formatLocalDateTime(timestampMillis: Long): String {
+    val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    return formatter.format(Date(timestampMillis))
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Paid
@@ -43,6 +44,7 @@ fun ExpenseFormSheet(
     categories: List<Category> = emptyList(),
     paymentSources: List<PaymentSource> = emptyList(),
     onSave: (name: String, amount: Double, category: String, paymentSource: String) -> Unit,
+    onDelete: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
@@ -65,18 +67,38 @@ fun ExpenseFormSheet(
             .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
-        // Form Title
-        Text(
-            text = when {
-                isEditMode -> "Edit Expense"
-                initialAmount != null -> "Capture Expense"
-                else -> "Log Expense Manually"
-            },
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = LightText,
-            modifier = Modifier.padding(bottom = 20.dp)
-        )
+        // Form Title + edit-mode delete action
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = when {
+                    isEditMode -> "Edit Expense"
+                    initialAmount != null -> "Capture Expense"
+                    else -> "Log Expense Manually"
+                },
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = LightText
+            )
+
+            if (isEditMode) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.testTag("expense_delete_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete expense",
+                        tint = ErrorRed
+                    )
+                }
+            }
+        }
 
         // Title/Name Field
         OutlinedTextField(
@@ -313,8 +335,7 @@ fun ExpenseFormSheet(
                     .fillMaxWidth()
                     .background(AccentYellow.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                     .border(1.dp, AccentYellow.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                    .padding(12.dp)
-                    .padding(bottom = 20.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -325,11 +346,14 @@ fun ExpenseFormSheet(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "This expense was auto-parsed from your message inbox.",
+                    text = "Auto-parsed from your message inbox.",
                     fontSize = 12.sp,
-                    color = LightText.copy(alpha = 0.9f)
+                    color = LightText.copy(alpha = 0.9f),
+                    maxLines = 1
                 )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
         // Action Buttons Row (Dismiss & Save)
