@@ -1,5 +1,6 @@
 package com.example.data.sync
 
+import com.example.data.model.AppThemePreference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
@@ -19,6 +20,7 @@ class UserProfileStore(private val firestore: FirebaseFirestore) {
             val docRef = userDoc(uid)
             val snapshot = transaction.get(docRef)
             val joinedAt = snapshot.getLong("joinedAt") ?: now
+            val themePreference = snapshot.getString("themePreference") ?: AppThemePreference.LIGHT.storageValue
 
             val profileData = mapOf(
                 "uid" to uid,
@@ -26,6 +28,7 @@ class UserProfileStore(private val firestore: FirebaseFirestore) {
                 "lastName" to lastName,
                 "email" to email,
                 "joinedAt" to joinedAt,
+                "themePreference" to themePreference,
                 "updatedAt" to now
             )
 
@@ -39,6 +42,24 @@ class UserProfileStore(private val firestore: FirebaseFirestore) {
                 mapOf(
                     "lastSyncAt" to timestamp,
                     "updatedAt" to timestamp
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    suspend fun getThemePreference(uid: String): AppThemePreference {
+        val snapshot = userDoc(uid).get().await()
+        return AppThemePreference.fromStorage(snapshot.getString("themePreference"))
+    }
+
+    suspend fun updateThemePreference(uid: String, preference: AppThemePreference) {
+        val now = System.currentTimeMillis()
+        userDoc(uid)
+            .set(
+                mapOf(
+                    "themePreference" to preference.storageValue,
+                    "updatedAt" to now
                 ),
                 SetOptions.merge()
             )

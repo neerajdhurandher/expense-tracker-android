@@ -68,19 +68,22 @@ class MainActivity : ComponentActivity() {
         handleNotificationIntents(intent, app)
 
         setContent {
-            MyApplicationTheme {
-                val currentUser by authViewModel.currentUser.collectAsState()
+            val currentUser by authViewModel.currentUser.collectAsState()
+            val themePreference by authViewModel.themePreference.collectAsState()
+            val isThemePreferenceLoading by authViewModel.isThemePreferenceLoading.collectAsState()
+
+            MyApplicationTheme(themePreference = themePreference) {
                 val navController = rememberNavController()
 
                 // Check SMS and Notification permissions at entry
                 PermissionRequestWrapper()
 
-                LaunchedEffect(currentUser) {
+                LaunchedEffect(currentUser, isThemePreferenceLoading) {
                     if (currentUser == null) {
                         navController.navigate("signin") {
                             popUpTo(0) { inclusive = true }
                         }
-                    } else {
+                    } else if (!isThemePreferenceLoading) {
                         navController.navigate("home") {
                             popUpTo(0) { inclusive = true }
                         }
@@ -89,95 +92,95 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(DarkBg)
-                ) {
-                    NavHost(
-                        navController = navController,
-                        startDestination = if (currentUser == null) "signin" else "home",
-                        enterTransition = { fadeIn(animationSpec = tween(250)) },
-                        exitTransition = { fadeOut(animationSpec = tween(250)) }
+                if (currentUser != null && isThemePreferenceLoading) {
+                    ThemePreferenceLoadingScreen()
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(DarkBg)
                     ) {
-                        composable("signin") {
-                            SignInScreen(
-                                viewModel = authViewModel,
-                                onSignInSuccess = {
-                                    navController.navigate("home") {
-                                        popUpTo("signin") { inclusive = true }
-                                    }
-                                }
-                            )
-                        }
-
-                        composable("home") {
-                            val user = currentUser
-                            if (user != null) {
-                                HomeScreen(
-                                    viewModel = homeViewModel,
-                                    userName = user.displayName,
-                                    userEmail = user.email,
-                                    onNavigateToGraph = { navController.navigate("graph") },
-                                    onNavigateToSettings = { navController.navigate("settings") },
-                                    onNavigateToBudget = { navController.navigate("budget") }
+                        NavHost(
+                            navController = navController,
+                            startDestination = if (currentUser == null) "signin" else "home",
+                            enterTransition = { fadeIn(animationSpec = tween(250)) },
+                            exitTransition = { fadeOut(animationSpec = tween(250)) }
+                        ) {
+                            composable("signin") {
+                                SignInScreen(
+                                    viewModel = authViewModel,
+                                    onSignInSuccess = {}
                                 )
-                            } else {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(color = AccentYellow)
+                            }
+
+                            composable("home") {
+                                val user = currentUser
+                                if (user != null) {
+                                    HomeScreen(
+                                        viewModel = homeViewModel,
+                                        userName = user.displayName,
+                                        userEmail = user.email,
+                                        onNavigateToGraph = { navController.navigate("graph") },
+                                        onNavigateToSettings = { navController.navigate("settings") },
+                                        onNavigateToBudget = { navController.navigate("budget") }
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(color = AccentYellow)
+                                    }
                                 }
                             }
-                        }
 
-                        composable("graph") {
-                            GraphScreen(
-                                viewModel = homeViewModel,
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                            composable("graph") {
+                                GraphScreen(
+                                    viewModel = homeViewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                        composable("settings") {
-                            SettingsScreen(
-                                authViewModel = authViewModel,
-                                homeViewModel = homeViewModel,
-                                isOnline = app.connectivityMonitor.isOnline.collectAsState().value,
-                                onNavigateBack = { navController.popBackStack() },
-                                onNavigateToCategories = { navController.navigate("categories") },
-                                onNavigateToSourceBudget = { navController.navigate("source_budget") },
-                                onSignOut = {
-                                    // Push pending changes before sign out
-                                    lifecycleScope.launch {
-                                        try { app.syncEngine.performFullSync() } catch (_: Exception) {}
-                                        app.database.clearAllTables()
-                                    }
-                                    authViewModel.signOut {
-                                        navController.navigate("signin") {
-                                            popUpTo(0) { inclusive = true }
+                            composable("settings") {
+                                SettingsScreen(
+                                    authViewModel = authViewModel,
+                                    homeViewModel = homeViewModel,
+                                    isOnline = app.connectivityMonitor.isOnline.collectAsState().value,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onNavigateToCategories = { navController.navigate("categories") },
+                                    onNavigateToSourceBudget = { navController.navigate("source_budget") },
+                                    onSignOut = {
+                                        // Push pending changes before sign out
+                                        lifecycleScope.launch {
+                                            try { app.syncEngine?.performFullSync() } catch (_: Exception) {}
+                                            app.database.clearAllTables()
+                                        }
+                                        authViewModel.signOut {
+                                            navController.navigate("signin") {
+                                                popUpTo(0) { inclusive = true }
+                                            }
                                         }
                                     }
-                                }
-                            )
-                        }
+                                )
+                            }
 
-                        composable("categories") {
-                            ManageCategoriesScreen(
-                                viewModel = homeViewModel,
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                            composable("categories") {
+                                ManageCategoriesScreen(
+                                    viewModel = homeViewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                        composable("budget") {
-                            BudgetScreen(
-                                viewModel = homeViewModel,
-                                onNavigateBack = { navController.popBackStack() }
-                            )
-                        }
+                            composable("budget") {
+                                BudgetScreen(
+                                    viewModel = homeViewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
 
-                        composable("source_budget") {
-                            SourceBudgetScreen(
-                                viewModel = homeViewModel,
-                                onNavigateBack = { navController.popBackStack() }
-                            )
+                            composable("source_budget") {
+                                SourceBudgetScreen(
+                                    viewModel = homeViewModel,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
                         }
                     }
                 }
@@ -267,6 +270,18 @@ class MainActivity : ComponentActivity() {
                 notificationManager.cancel(notificationId)
             }
         }
+    }
+}
+
+@Composable
+private fun ThemePreferenceLoadingScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBg),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(color = AccentYellow)
     }
 }
 
