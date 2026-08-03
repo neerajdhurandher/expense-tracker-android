@@ -290,24 +290,28 @@ class HomeViewModel(
         _pendingSmsExpense.value = null
     }
 
-    fun savePendingSmsExpense(name: String, amount: Double, category: String, paymentSource: String) {
+    fun savePendingSmsExpense(name: String, amount: Double, category: String, paymentSource: String, occurredAt: Long = System.currentTimeMillis()) {
         val pending = _pendingSmsExpense.value ?: return
         if (pending.expenseId > 0) {
             viewModelScope.launch {
                 val existing = expenseRepository.getExpenseById(pending.expenseId)
                 if (existing != null) {
+                    val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                    val yearMonthStr = sdf.format(Date(occurredAt))
                     val updated = existing.copy(
                         name = name,
                         amount = amount,
                         category = category,
                         paymentSource = paymentSource,
+                        occurredAt = occurredAt,
+                        yearMonth = yearMonthStr,
                         isTracked = true
                     )
                     expenseRepository.updateExpense(updated)
                 }
             }
         } else {
-            addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt, paymentSource)
+            addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, occurredAt, paymentSource)
         }
         _pendingSmsExpense.value = null
     }
@@ -320,13 +324,17 @@ class HomeViewModel(
         }
     }
 
-    fun confirmExpenseWithEdits(expense: Expense, name: String, amount: Double, category: String, paymentSource: String) {
+    fun confirmExpenseWithEdits(expense: Expense, name: String, amount: Double, category: String, paymentSource: String, occurredAt: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+            val yearMonthStr = sdf.format(Date(occurredAt))
             val updated = expense.copy(
                 name = name,
                 amount = amount,
                 category = category,
                 paymentSource = paymentSource,
+                occurredAt = occurredAt,
+                yearMonth = yearMonthStr,
                 isTracked = true
             )
             expenseRepository.updateExpense(updated)
@@ -348,9 +356,9 @@ class HomeViewModel(
         _selectedMonth.value = month
     }
 
-    fun addManualExpense(name: String, amount: Double, category: String, paymentSource: String = "UPI") {
+    fun addManualExpense(name: String, amount: Double, category: String, paymentSource: String = "UPI", occurredAt: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
+            val now = occurredAt
             val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
             val yearMonthStr = sdf.format(Date(now))
 
@@ -441,13 +449,17 @@ class HomeViewModel(
         }
     }
 
-    fun updateExpense(expense: Expense, name: String, amount: Double, category: String, paymentSource: String) {
+    fun updateExpense(expense: Expense, name: String, amount: Double, category: String, paymentSource: String, occurredAt: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+            val yearMonthStr = sdf.format(Date(occurredAt))
             val updated = expense.copy(
                 name = name,
                 amount = amount,
                 category = category,
-                paymentSource = paymentSource
+                paymentSource = paymentSource,
+                occurredAt = occurredAt,
+                yearMonth = yearMonthStr
             )
             expenseRepository.updateExpense(updated)
         }

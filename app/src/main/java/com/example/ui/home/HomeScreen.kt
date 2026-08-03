@@ -705,8 +705,8 @@ fun HomeScreen(
                     ExpenseFormSheet(
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.addManualExpense(name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.addManualExpense(name, amount, category, paymentSource, selectedDate)
                             showAddForm = false
                         },
                         onDismiss = { showAddForm = false }
@@ -728,11 +728,12 @@ fun HomeScreen(
                         initialAmount = expense.amount,
                         initialCategory = expense.category,
                         initialPaymentSource = expense.paymentSource,
+                        initialDate = expense.occurredAt,
                         isEditMode = true,
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.updateExpense(expense, name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.updateExpense(expense, name, amount, category, paymentSource, selectedDate)
                             editingExpense = null
                         },
                         onDelete = {
@@ -762,10 +763,11 @@ fun HomeScreen(
                         initialAmount = smsData.amount,
                         initialCategory = smsData.category,
                         initialPaymentSource = smsData.paymentSource,
+                        initialDate = smsData.occurredAt,
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.savePendingSmsExpense(name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.savePendingSmsExpense(name, amount, category, paymentSource, selectedDate)
                             showSmsEditForm = false
                         },
                         onDismiss = {
@@ -790,11 +792,12 @@ fun HomeScreen(
                         initialAmount = expense.amount,
                         initialCategory = expense.category,
                         initialPaymentSource = expense.paymentSource,
+                        initialDate = expense.occurredAt,
                         isEditMode = true,
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.confirmExpenseWithEdits(expense, name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.confirmExpenseWithEdits(expense, name, amount, category, paymentSource, selectedDate)
                             editingUntrackedExpense = null
                         },
                         onDelete = {
