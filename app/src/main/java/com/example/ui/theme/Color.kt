@@ -27,14 +27,14 @@ internal val LightExpenseTrackerColors = ExpenseTrackerColors(
 )
 
 internal val DarkExpenseTrackerColors = ExpenseTrackerColors(
-	background = Color(0xFF020617),
-	surface = Color(0xFF111827),
-	accent = Color(0xFF5B6BEA),
-	onAccent = Color(0xFF020617),
-	textPrimary = Color(0xFFF8FAFC),
-	textSecondary = Color(0xFF94A3B8),
+	background = Color(0xFF0B0B0D),
+	surface = Color(0xFF17181C),
+	accent = Color(0xFF6366F1),
+	onAccent = Color(0xFFFFFFFF),
+	textPrimary = Color(0xFFF5F5F5),
+	textSecondary = Color(0xFFA3A3A3),
 	error = Color(0xFFF87171),
-	border = Color(0xFF1E293B)
+	border = Color(0xFF2A2D33)
 )
 
 internal val LocalExpenseTrackerColors = staticCompositionLocalOf { LightExpenseTrackerColors }
