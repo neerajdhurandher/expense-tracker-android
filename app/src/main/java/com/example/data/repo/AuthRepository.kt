@@ -6,11 +6,17 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.example.data.model.User
+import com.example.data.sync.UserProfileStore
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +28,8 @@ class AuthRepository(private val context: Context) {
     }
 
     private val firebaseAuth = FirebaseAuth.getInstance()
+    private val userProfileStore = UserProfileStore(FirebaseFirestore.getInstance())
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
@@ -30,10 +38,13 @@ class AuthRepository(private val context: Context) {
         // Restore Firebase auth state on creation
         val fbUser = firebaseAuth.currentUser
         _currentUser.value = fbUser?.toUser()
+        fbUser?.let { persistProfileAsync(it) }
 
         // Listen for auth state changes
         firebaseAuth.addAuthStateListener { auth ->
-            _currentUser.value = auth.currentUser?.toUser()
+            val current = auth.currentUser
+            _currentUser.value = current?.toUser()
+            current?.let { persistProfileAsync(it) }
         }
     }
 
@@ -68,6 +79,13 @@ class AuthRepository(private val context: Context) {
             val user = authResult.user?.toUser()
                 ?: return Result.failure(Exception("Firebase authentication failed"))
 
+            // Store identity metadata only in Firestore users/{uid}; never in local DB.
+            userProfileStore.upsertProfileFromGoogle(
+                uid = user.uid,
+                displayName = authResult.user?.displayName,
+                email = user.email
+            )
+
             Log.i(TAG, "✅ Google Sign-In successful: ${user.email}")
             _currentUser.value = user
             Result.success(user)
@@ -93,6 +111,21 @@ class AuthRepository(private val context: Context) {
     }
 
     fun getCurrentFirebaseUser(): FirebaseUser? = firebaseAuth.currentUser
+
+    private fun persistProfileAsync(firebaseUser: FirebaseUser) {
+        val email = firebaseUser.email ?: return
+        repoScope.launch {
+            try {
+                userProfileStore.upsertProfileFromGoogle(
+                    uid = firebaseUser.uid,
+                    displayName = firebaseUser.displayName,
+                    email = email
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "Profile sync skipped: ${e.message}")
+            }
+        }
+    }
 
     private fun FirebaseUser.toUser(): User = User(
         uid = uid,
