@@ -37,18 +37,23 @@ fun SignInScreen(
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val backgroundColor = DarkBg
+    val accentColor = AccentYellow
+    val primaryTextColor = LightText
+    val secondaryTextColor = MutedText
+    val errorColor = ErrorRed
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBg)
+            .background(backgroundColor)
             .padding(24.dp)
     ) {
         // Decorative background glowing accents
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(AccentYellow.copy(alpha = 0.08f), Color.Transparent),
+                    colors = listOf(accentColor.copy(alpha = 0.08f), Color.Transparent),
                     center = Offset(size.width * 0.8f, size.height * 0.2f),
                     radius = 400f
                 ),
@@ -57,7 +62,7 @@ fun SignInScreen(
             )
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(AccentYellow.copy(alpha = 0.04f), Color.Transparent),
+                    colors = listOf(accentColor.copy(alpha = 0.04f), Color.Transparent),
                     center = Offset(size.width * 0.2f, size.height * 0.8f),
                     radius = 500f
                 ),
@@ -88,11 +93,11 @@ fun SignInScreen(
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         drawCircle(
-                            color = AccentYellow.copy(alpha = 0.15f),
+                            color = accentColor.copy(alpha = 0.15f),
                             radius = size.minDimension / 2.3f
                         )
                         drawCircle(
-                            color = AccentYellow,
+                            color = accentColor,
                             radius = size.minDimension / 2.3f,
                             style = Stroke(
                                 width = 4f,
@@ -104,7 +109,7 @@ fun SignInScreen(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .size(76.dp)
-                            .background(AccentYellow, CircleShape)
+                            .background(accentColor, CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.AccountBalanceWallet,
@@ -122,7 +127,7 @@ fun SignInScreen(
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.4.sp,
-                    color = LightText,
+                    color = primaryTextColor,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.testTag("app_title_signin")
                 )
@@ -132,7 +137,7 @@ fun SignInScreen(
                 Text(
                     text = "A modern financial scanner.\nInspect transaction SMS instantly.",
                     fontSize = 15.sp,
-                    color = MutedText,
+                    color = secondaryTextColor,
                     textAlign = TextAlign.Center,
                     lineHeight = 22.sp,
                     fontWeight = FontWeight.Medium
@@ -149,7 +154,7 @@ fun SignInScreen(
                 // Error message
                 if (errorMessage != null) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = ErrorRed.copy(alpha = 0.1f)),
+                        colors = CardDefaults.cardColors(containerColor = errorColor.copy(alpha = 0.1f)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -157,7 +162,7 @@ fun SignInScreen(
                     ) {
                         Text(
                             text = errorMessage ?: "",
-                            color = ErrorRed,
+                            color = errorColor,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
@@ -167,7 +172,7 @@ fun SignInScreen(
 
                 if (isLoading) {
                     CircularProgressIndicator(
-                        color = AccentYellow,
+                        color = accentColor,
                         modifier = Modifier.padding(16.dp)
                     )
                 } else {
@@ -187,8 +192,8 @@ fun SignInScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = AccentYellow,
-                            contentColor = DarkBg
+                            containerColor = accentColor,
+                            contentColor = backgroundColor
                         ),
                         modifier = Modifier
                             .fillMaxWidth()

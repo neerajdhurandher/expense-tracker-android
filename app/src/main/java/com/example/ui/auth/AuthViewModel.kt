@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.model.AppThemePreference
 import com.example.data.model.User
 import com.example.data.repo.AuthRepository
 import kotlinx.coroutines.flow.StateFlow
@@ -12,6 +13,8 @@ import kotlinx.coroutines.launch
 class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
 
     val currentUser: StateFlow<User?> = authRepository.currentUser
+    val themePreference: StateFlow<AppThemePreference> = authRepository.themePreference
+    val isThemePreferenceLoading: StateFlow<Boolean> = authRepository.isThemePreferenceLoading
 
     /**
      * Trigger Google Sign-In flow using Credential Manager.
@@ -27,6 +30,13 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun signOut(onResult: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val result = authRepository.signOut()
+            onResult(result)
+        }
+    }
+
+    fun updateThemePreference(preference: AppThemePreference, onResult: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = authRepository.updateThemePreference(preference)
             onResult(result)
         }
     }

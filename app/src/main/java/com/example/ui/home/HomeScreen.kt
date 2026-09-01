@@ -3,6 +3,8 @@ package com.example.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -66,9 +68,27 @@ fun HomeScreen(
     var editingUntrackedExpense by remember { mutableStateOf<Expense?>(null) }
     var untrackedSectionExpanded by remember { mutableStateOf(true) }
     var showFilterSheet by remember { mutableStateOf(false) }
+    var showSingleDeleteConfirmation by remember { mutableStateOf(false) }
+    var showBulkDeleteConfirmation by remember { mutableStateOf(false) }
+    var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
+    val selectedExpenseIds = remember { mutableStateListOf<Long>() }
+    val isSelectionMode = selectedExpenseIds.isNotEmpty()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    fun toggleSelection(expenseId: Long) {
+        if (selectedExpenseIds.contains(expenseId)) {
+            selectedExpenseIds.remove(expenseId)
+        } else {
+            selectedExpenseIds.add(expenseId)
+        }
+    }
+
+    LaunchedEffect(expenses) {
+        val visibleIds = expenses.map { it.id }.toSet()
+        selectedExpenseIds.removeAll { it !in visibleIds }
+    }
 
     // Auto-show edit form when a pending SMS expense arrives from notification
     LaunchedEffect(pendingSmsExpense) {
@@ -90,20 +110,22 @@ fun HomeScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddForm = true },
-                containerColor = AccentYellow,
-                contentColor = DarkBg,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .testTag("add_expense_fab")
-                    .padding(bottom = 8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add manual expense",
-                    modifier = Modifier.size(28.dp)
-                )
+            if (!isSelectionMode) {
+                FloatingActionButton(
+                    onClick = { showAddForm = true },
+                    containerColor = AccentYellow,
+                    contentColor = DarkBg,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .testTag("add_expense_fab")
+                        .padding(bottom = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add manual expense",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         },
         containerColor = DarkBg
@@ -517,50 +539,77 @@ fun HomeScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "History",
+                            text = if (isSelectionMode) "Selected (${selectedExpenseIds.size})" else "History",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = LightText
                         )
 
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .height(36.dp)
-                                .background(DarkSurface, RoundedCornerShape(10.dp))
-                                .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
-                                .clickable { showFilterSheet = true }
-                                .padding(horizontal = 12.dp)
-                                .testTag("filter_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FilterList,
-                                contentDescription = "Filter",
-                                tint = if (historyFilter !is HistoryFilter.All) AccentYellow else MutedText,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = when (historyFilter) {
-                                    is HistoryFilter.All -> "Filter"
-                                    is HistoryFilter.Saved -> "Saved"
-                                    is HistoryFilter.ByCategory -> (historyFilter as HistoryFilter.ByCategory).categoryName
-                                    is HistoryFilter.BySource -> (historyFilter as HistoryFilter.BySource).sourceName
-                                },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (historyFilter !is HistoryFilter.All) AccentYellow else LightText
-                            )
-                            if (historyFilter !is HistoryFilter.All) {
-                                Spacer(modifier = Modifier.width(6.dp))
+                        if (isSelectionMode) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .background(DarkSurface, RoundedCornerShape(10.dp))
+                                    .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+                                    .clickable { selectedExpenseIds.clear() }
+                                    .padding(horizontal = 12.dp)
+                                    .testTag("cancel_selection_button")
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear filter",
-                                    tint = AccentYellow,
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clickable { viewModel.setHistoryFilter(HistoryFilter.All) }
+                                    contentDescription = "Cancel selection",
+                                    tint = MutedText,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Cancel",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = LightText
+                                )
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .background(DarkSurface, RoundedCornerShape(10.dp))
+                                    .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
+                                    .clickable { showFilterSheet = true }
+                                    .padding(horizontal = 12.dp)
+                                    .testTag("filter_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FilterList,
+                                    contentDescription = "Filter",
+                                    tint = if (historyFilter !is HistoryFilter.All) AccentYellow else MutedText,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = when (historyFilter) {
+                                        is HistoryFilter.All -> "Filter"
+                                        is HistoryFilter.Saved -> "Saved"
+                                        is HistoryFilter.ByCategory -> (historyFilter as HistoryFilter.ByCategory).categoryName
+                                        is HistoryFilter.BySource -> (historyFilter as HistoryFilter.BySource).sourceName
+                                    },
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (historyFilter !is HistoryFilter.All) AccentYellow else LightText
+                                )
+                                if (historyFilter !is HistoryFilter.All) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear filter",
+                                        tint = AccentYellow,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { viewModel.setHistoryFilter(HistoryFilter.All) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -607,36 +656,31 @@ fun HomeScreen(
                             expense = expense,
                             categories = categories,
                             paymentSources = paymentSources,
-                            isEditable = viewModel.isCurrentMonth(expense),
+                            isEditable = viewModel.isCurrentMonth(expense) && !isSelectionMode,
+                            isSelected = selectedExpenseIds.contains(expense.id),
                             onEdit = {
                                 if (viewModel.isCurrentMonth(expense)) {
                                     editingExpense = expense
                                 }
                             },
                             onClick = {
-                                if (viewModel.isCurrentMonth(expense)) {
-                                    editingExpense = expense
+                                if (isSelectionMode) {
+                                    toggleSelection(expense.id)
                                 } else {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Only current month's expenses can be edited",
-                                            duration = SnackbarDuration.Short
-                                        )
+                                    if (viewModel.isCurrentMonth(expense)) {
+                                        editingExpense = expense
+                                    } else {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = "Only current month's expenses can be edited",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                        }
                                     }
                                 }
                             },
-                            onDelete = {
-                                viewModel.deleteExpense(expense)
-                                coroutineScope.launch {
-                                    val snackbarResult = snackbarHostState.showSnackbar(
-                                        message = "Deleted: ${expense.name}",
-                                        actionLabel = "UNDO",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                    if (snackbarResult == SnackbarResult.ActionPerformed) {
-                                        viewModel.undoDeleteExpense()
-                                    }
-                                }
+                            onLongPress = {
+                                toggleSelection(expense.id)
                             }
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -661,8 +705,8 @@ fun HomeScreen(
                     ExpenseFormSheet(
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.addManualExpense(name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.addManualExpense(name, amount, category, paymentSource, selectedDate)
                             showAddForm = false
                         },
                         onDismiss = { showAddForm = false }
@@ -684,12 +728,17 @@ fun HomeScreen(
                         initialAmount = expense.amount,
                         initialCategory = expense.category,
                         initialPaymentSource = expense.paymentSource,
+                        initialDate = expense.occurredAt,
                         isEditMode = true,
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.updateExpense(expense, name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.updateExpense(expense, name, amount, category, paymentSource, selectedDate)
                             editingExpense = null
+                        },
+                        onDelete = {
+                            expenseToDelete = expense
+                            showSingleDeleteConfirmation = true
                         },
                         onDismiss = { editingExpense = null }
                     )
@@ -714,10 +763,11 @@ fun HomeScreen(
                         initialAmount = smsData.amount,
                         initialCategory = smsData.category,
                         initialPaymentSource = smsData.paymentSource,
+                        initialDate = smsData.occurredAt,
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.savePendingSmsExpense(name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.savePendingSmsExpense(name, amount, category, paymentSource, selectedDate)
                             showSmsEditForm = false
                         },
                         onDismiss = {
@@ -742,11 +792,17 @@ fun HomeScreen(
                         initialAmount = expense.amount,
                         initialCategory = expense.category,
                         initialPaymentSource = expense.paymentSource,
+                        initialDate = expense.occurredAt,
+                        isEditMode = true,
                         categories = categories,
                         paymentSources = paymentSources,
-                        onSave = { name, amount, category, paymentSource ->
-                            viewModel.confirmExpenseWithEdits(expense, name, amount, category, paymentSource)
+                        onSave = { name, amount, category, paymentSource, selectedDate ->
+                            viewModel.confirmExpenseWithEdits(expense, name, amount, category, paymentSource, selectedDate)
                             editingUntrackedExpense = null
+                        },
+                        onDelete = {
+                            expenseToDelete = expense
+                            showSingleDeleteConfirmation = true
                         },
                         onDismiss = { editingUntrackedExpense = null }
                     )
@@ -793,6 +849,98 @@ fun HomeScreen(
                         }
                     )
                 }
+            }
+
+            if (showSingleDeleteConfirmation && expenseToDelete != null) {
+                AlertDialog(
+                    onDismissRequest = { showSingleDeleteConfirmation = false },
+                    title = { Text("Delete expense?") },
+                    text = { Text("This action will permanently remove this expense.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val target = expenseToDelete ?: return@TextButton
+                                viewModel.deleteExpense(target)
+                                editingExpense = null
+                                editingUntrackedExpense = null
+                                expenseToDelete = null
+                                showSingleDeleteConfirmation = false
+
+                                coroutineScope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Deleted: ${target.name}",
+                                        actionLabel = "UNDO",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.undoDeleteExpense()
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("Delete", color = ErrorRed)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showSingleDeleteConfirmation = false
+                            expenseToDelete = null
+                        }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (showBulkDeleteConfirmation) {
+                val selectedExpenses = expenses.filter { selectedExpenseIds.contains(it.id) }
+                AlertDialog(
+                    onDismissRequest = { showBulkDeleteConfirmation = false },
+                    title = { Text("Delete selected expenses?") },
+                    text = { Text("This will delete ${selectedExpenses.size} selected expense(s).") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteExpenses(selectedExpenses)
+                                selectedExpenseIds.clear()
+                                showBulkDeleteConfirmation = false
+
+                                coroutineScope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Deleted ${selectedExpenses.size} expenses",
+                                        actionLabel = "UNDO",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.undoDeleteExpense()
+                                    }
+                                }
+                            }
+                        ) {
+                            Text("Delete", color = ErrorRed)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showBulkDeleteConfirmation = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (isSelectionMode) {
+                ExtendedFloatingActionButton(
+                    onClick = { showBulkDeleteConfirmation = true },
+                    containerColor = ErrorRed,
+                    contentColor = Color.White,
+                    icon = { Icon(Icons.Default.Delete, contentDescription = "Delete selected") },
+                    text = { Text("Delete (${selectedExpenseIds.size})", fontWeight = FontWeight.Bold) },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
+                        .navigationBarsPadding()
+                        .testTag("bulk_delete_fab")
+                )
             }
         }
     }
@@ -988,24 +1136,22 @@ fun UntrackedExpenseItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ExpenseItemRow(
     expense: Expense,
     categories: List<Category>,
     paymentSources: List<PaymentSource> = emptyList(),
     isEditable: Boolean = false,
+    isSelected: Boolean = false,
     onEdit: () -> Unit = {},
     onClick: () -> Unit = {},
-    onDelete: () -> Unit
+    onLongPress: () -> Unit = {}
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.EndToStart -> {
-                    onDelete()
-                    true
-                }
+                SwipeToDismissBoxValue.EndToStart -> false
                 SwipeToDismissBoxValue.StartToEnd -> {
                     if (isEditable) {
                         onEdit()
@@ -1020,26 +1166,10 @@ fun ExpenseItemRow(
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = isEditable,
+        enableDismissFromEndToStart = false,
         backgroundContent = {
             val direction = dismissState.dismissDirection
-            if (direction == SwipeToDismissBoxValue.EndToStart) {
-                val color = Color(0xFFFF5252)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(color)
-                        .padding(horizontal = 20.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteSweep,
-                        contentDescription = "Swipe to delete",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            } else if (direction == SwipeToDismissBoxValue.StartToEnd && isEditable) {
+            if (direction == SwipeToDismissBoxValue.StartToEnd && isEditable) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1064,10 +1194,20 @@ fun ExpenseItemRow(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(DarkSurface, RoundedCornerShape(16.dp))
-                    .border(1.dp, CardBorder, RoundedCornerShape(16.dp))
+                    .background(
+                        if (isSelected) AccentYellow.copy(alpha = 0.10f) else DarkSurface,
+                        RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        1.dp,
+                        if (isSelected) AccentYellow else CardBorder,
+                        RoundedCornerShape(16.dp)
+                    )
                     .clip(RoundedCornerShape(16.dp))
-                    .clickable { onClick() }
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongPress
+                    )
                     .padding(16.dp)
                     .testTag("expense_item_${expense.id}"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1157,6 +1297,15 @@ fun ExpenseItemRow(
                 Column(
                     horizontalAlignment = Alignment.End
                 ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Selected",
+                            tint = AccentYellow,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
                     Text(
                         text = "₹${String.format(Locale.getDefault(), "%,.2f", expense.amount)}",
                         fontSize = 15.sp,

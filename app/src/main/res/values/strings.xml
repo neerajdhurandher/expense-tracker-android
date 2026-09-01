@@ -1,4 +1,21 @@
 <resources>
     <string name="app_name">Expense Tracker</string>
     <string name="default_web_client_id">46616115122-bhc5mm2i1dlg5q741ao8pp1ip8u3pvv7.apps.googleusercontent.com</string>
+    <string name="widget_title_expenses">Expenses</string>
+    <string name="widget_title_expenses_today">Today\'s Expenses</string>
+    <string name="widget_title_expenses_month">This Month\'s Expenses</string>
+    <string name="widget_interval_today">Today</string>
+    <string name="widget_interval_week">This Week</string>
+    <string name="widget_interval_month">This Month</string>
+    <string name="widget_refresh_content_description">Refresh widget</string>
+    <string name="widget_open_app_content_description">Open Expense Tracker</string>
+    <string name="widget_no_change">No change vs previous</string>
+    <string name="widget_new_vs_previous">New vs previous</string>
+    <string name="widget_transactions_format">%1$d txns | %2$s</string>
+    <string name="widget_trend_format">%1$s%2$.1f%% vs previous</string>
+    <string name="widget_tab_today_short">T</string>
+    <string name="widget_tab_week_short">W</string>
+    <string name="widget_tab_month_short">M</string>
+    <string name="widget_amount_default">₹0</string>
+    <string name="widget_meta_default">0 txns | No change</string>
 </resources>

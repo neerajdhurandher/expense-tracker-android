@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.model.AppThemePreference
 import com.example.data.sync.SyncState
 import com.example.ui.auth.AuthViewModel
 import com.example.ui.home.HomeViewModel
@@ -42,7 +44,10 @@ fun SettingsScreen(
     onSignOut: () -> Unit
 ) {
     val currentUser by authViewModel.currentUser.collectAsState()
+    val themePreference by authViewModel.themePreference.collectAsState()
     val syncState by homeViewModel.syncState.collectAsState()
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var themeStatusMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -278,6 +283,30 @@ fun SettingsScreen(
                 testTag = "settings_source_budget_row"
             )
 
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // ── Section: Appearance ──
+            Text(
+                text = "APPEARANCE",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MutedText,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)
+            )
+
+            SettingsRow(
+                icon = Icons.Default.Palette,
+                title = "Theme",
+                subtitle = "Light, Dark, or System",
+                onClick = {
+                    themeStatusMessage = null
+                    showThemeDialog = true
+                },
+                testTag = "settings_theme_row"
+            )
+
+
             Spacer(modifier = Modifier.height(32.dp))
 
             // ── Section: Account ──
@@ -343,6 +372,147 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showThemeDialog) {
+        ThemeSelectionDialog(
+            selectedPreference = themePreference,
+            statusMessage = themeStatusMessage,
+            onDismiss = { showThemeDialog = false },
+            onSelectPreference = { preference ->
+                themeStatusMessage = null
+                authViewModel.updateThemePreference(preference) { result ->
+                    result.onFailure { themeStatusMessage = it.message ?: "Failed to save theme" }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ThemeSelectionDialog(
+    selectedPreference: AppThemePreference,
+    statusMessage: String?,
+    onDismiss: () -> Unit,
+    onSelectPreference: (AppThemePreference) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurface,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done", color = AccentYellow)
+            }
+        },
+        title = {
+            Text(
+                text = "Choose Theme",
+                color = LightText,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Saved to your Firebase profile and applied after sign-in.",
+                    fontSize = 12.sp,
+                    color = MutedText
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                ThemePreferenceOption(
+                    title = "Light",
+                    subtitle = "Default theme for new users",
+                    preference = AppThemePreference.LIGHT,
+                    selectedPreference = selectedPreference,
+                    testTag = "settings_theme_light",
+                    onSelected = { onSelectPreference(AppThemePreference.LIGHT) }
+                )
+
+                HorizontalDivider(color = CardBorder.copy(alpha = 0.7f))
+
+                ThemePreferenceOption(
+                    title = "Dark",
+                    subtitle = "Dark surfaces with light text",
+                    preference = AppThemePreference.DARK,
+                    selectedPreference = selectedPreference,
+                    testTag = "settings_theme_dark",
+                    onSelected = { onSelectPreference(AppThemePreference.DARK) }
+                )
+
+                HorizontalDivider(color = CardBorder.copy(alpha = 0.7f))
+
+                ThemePreferenceOption(
+                    title = "System",
+                    subtitle = "Follow your device appearance",
+                    preference = AppThemePreference.SYSTEM,
+                    selectedPreference = selectedPreference,
+                    testTag = "settings_theme_system",
+                    onSelected = { onSelectPreference(AppThemePreference.SYSTEM) }
+                )
+
+                if (statusMessage != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = statusMessage,
+                        fontSize = 12.sp,
+                        color = ErrorRed
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = AccentYellow)
+            }
+        }
+    )
+}
+
+@Composable
+private fun ThemePreferenceOption(
+    title: String,
+    subtitle: String,
+    preference: AppThemePreference,
+    selectedPreference: AppThemePreference,
+    testTag: String,
+    onSelected: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selectedPreference == preference,
+                onClick = onSelected
+            )
+            .padding(vertical = 12.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = LightText
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = MutedText
+            )
+        }
+
+        RadioButton(
+            selected = selectedPreference == preference,
+            onClick = onSelected,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = AccentYellow,
+                unselectedColor = MutedText
+            )
+        )
     }
 }
 

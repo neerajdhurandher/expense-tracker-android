@@ -158,8 +158,8 @@ class HomeViewModel(
             initialValue = emptyList()
         )
 
-    // Keeps track of the last deleted item for Undo action
-    private var recentlyDeletedExpense: Expense? = null
+    // Keeps track of the last delete batch for Undo action (single or bulk)
+    private var recentlyDeletedExpenses: List<Expense> = emptyList()
 
     // Current month in "YYYY-MM" format for edit eligibility check
     private val currentYearMonth: String = SimpleDateFormat("yyyy-MM", Locale.US).format(Date())
@@ -290,24 +290,28 @@ class HomeViewModel(
         _pendingSmsExpense.value = null
     }
 
-    fun savePendingSmsExpense(name: String, amount: Double, category: String, paymentSource: String) {
+    fun savePendingSmsExpense(name: String, amount: Double, category: String, paymentSource: String, occurredAt: Long = System.currentTimeMillis()) {
         val pending = _pendingSmsExpense.value ?: return
         if (pending.expenseId > 0) {
             viewModelScope.launch {
                 val existing = expenseRepository.getExpenseById(pending.expenseId)
                 if (existing != null) {
+                    val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                    val yearMonthStr = sdf.format(Date(occurredAt))
                     val updated = existing.copy(
                         name = name,
                         amount = amount,
                         category = category,
                         paymentSource = paymentSource,
+                        occurredAt = occurredAt,
+                        yearMonth = yearMonthStr,
                         isTracked = true
                     )
                     expenseRepository.updateExpense(updated)
                 }
             }
         } else {
-            addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, pending.occurredAt, paymentSource)
+            addParsedSmsExpense(name, amount, category, pending.rawSms, pending.sender, occurredAt, paymentSource)
         }
         _pendingSmsExpense.value = null
     }
@@ -320,13 +324,17 @@ class HomeViewModel(
         }
     }
 
-    fun confirmExpenseWithEdits(expense: Expense, name: String, amount: Double, category: String, paymentSource: String) {
+    fun confirmExpenseWithEdits(expense: Expense, name: String, amount: Double, category: String, paymentSource: String, occurredAt: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+            val yearMonthStr = sdf.format(Date(occurredAt))
             val updated = expense.copy(
                 name = name,
                 amount = amount,
                 category = category,
                 paymentSource = paymentSource,
+                occurredAt = occurredAt,
+                yearMonth = yearMonthStr,
                 isTracked = true
             )
             expenseRepository.updateExpense(updated)
@@ -335,7 +343,7 @@ class HomeViewModel(
 
     fun dismissUntrackedExpense(expense: Expense) {
         viewModelScope.launch {
-            recentlyDeletedExpense = expense
+            recentlyDeletedExpenses = listOf(expense)
             expenseRepository.deleteExpenseById(expense.id)
         }
     }
@@ -348,9 +356,9 @@ class HomeViewModel(
         _selectedMonth.value = month
     }
 
-    fun addManualExpense(name: String, amount: Double, category: String, paymentSource: String = "UPI") {
+    fun addManualExpense(name: String, amount: Double, category: String, paymentSource: String = "UPI", occurredAt: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
+            val now = occurredAt
             val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
             val yearMonthStr = sdf.format(Date(now))
 
@@ -391,16 +399,29 @@ class HomeViewModel(
 
     fun deleteExpense(expense: Expense) {
         viewModelScope.launch {
-            recentlyDeletedExpense = expense
+            recentlyDeletedExpenses = listOf(expense)
             expenseRepository.deleteExpenseById(expense.id)
         }
     }
 
-    fun undoDeleteExpense() {
-        val expenseToRestore = recentlyDeletedExpense ?: return
+    fun deleteExpenses(expenses: List<Expense>) {
+        if (expenses.isEmpty()) return
         viewModelScope.launch {
-            expenseRepository.insertExpense(expenseToRestore)
-            recentlyDeletedExpense = null
+            recentlyDeletedExpenses = expenses
+            expenses.forEach { expense ->
+                expenseRepository.deleteExpenseById(expense.id)
+            }
+        }
+    }
+
+    fun undoDeleteExpense() {
+        val expensesToRestore = recentlyDeletedExpenses
+        if (expensesToRestore.isEmpty()) return
+        viewModelScope.launch {
+            expensesToRestore.forEach { expense ->
+                expenseRepository.insertExpense(expense)
+            }
+            recentlyDeletedExpenses = emptyList()
         }
     }
 
@@ -428,13 +449,17 @@ class HomeViewModel(
         }
     }
 
-    fun updateExpense(expense: Expense, name: String, amount: Double, category: String, paymentSource: String) {
+    fun updateExpense(expense: Expense, name: String, amount: Double, category: String, paymentSource: String, occurredAt: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
+            val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+            val yearMonthStr = sdf.format(Date(occurredAt))
             val updated = expense.copy(
                 name = name,
                 amount = amount,
                 category = category,
-                paymentSource = paymentSource
+                paymentSource = paymentSource,
+                occurredAt = occurredAt,
+                yearMonth = yearMonthStr
             )
             expenseRepository.updateExpense(updated)
         }

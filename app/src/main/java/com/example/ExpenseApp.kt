@@ -36,7 +36,7 @@ class ExpenseApp : Application() {
         private set
     lateinit var budgetRepository: BudgetRepository
         private set
-    lateinit var syncEngine: SyncEngine
+    var syncEngine: SyncEngine? = null
         private set
     lateinit var connectivityMonitor: ConnectivityMonitor
         private set
@@ -52,13 +52,18 @@ class ExpenseApp : Application() {
         connectivityMonitor = ConnectivityMonitor(this)
         connectivityMonitor.startMonitoring()
 
-        syncEngine = SyncEngine(
-            firestore = FirebaseFirestore.getInstance(),
-            expenseDao = database.expenseDao(),
-            categoryDao = database.categoryDao(),
-            paymentSourceDao = database.paymentSourceDao(),
-            sourceBudgetDao = database.sourceBudgetDao()
-        )
+        syncEngine = runCatching {
+            SyncEngine(
+                firestore = FirebaseFirestore.getInstance(),
+                expenseDao = database.expenseDao(),
+                categoryDao = database.categoryDao(),
+                paymentSourceDao = database.paymentSourceDao(),
+                sourceBudgetDao = database.sourceBudgetDao()
+            )
+        }.getOrElse {
+            Log.w(TAG, "Firebase sync disabled: ${it.message}")
+            null
+        }
 
         // Initialize repositories with SyncEngine
         expenseRepository = ExpenseRepository(database.expenseDao(), syncEngine)
@@ -73,7 +78,7 @@ class ExpenseApp : Application() {
             connectivityMonitor.isOnline.collect { online ->
                 if (online && authRepository.currentUser.value != null) {
                     Log.i(TAG, "Network restored — triggering sync")
-                    syncEngine.performFullSync()
+                    syncEngine?.performFullSync()
                 }
             }
         }

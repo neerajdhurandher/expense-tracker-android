@@ -10,11 +10,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +33,8 @@ import com.example.ui.theme.DarkSurface
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.LightText
 import com.example.ui.theme.MutedText
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,10 +43,12 @@ fun ExpenseFormSheet(
     initialAmount: Double? = null,
     initialCategory: String = "Other",
     initialPaymentSource: String = "UPI",
+    initialDate: Long = System.currentTimeMillis(),
     isEditMode: Boolean = false,
     categories: List<Category> = emptyList(),
     paymentSources: List<PaymentSource> = emptyList(),
-    onSave: (name: String, amount: Double, category: String, paymentSource: String) -> Unit,
+    onSave: (name: String, amount: Double, category: String, paymentSource: String, selectedDate: Long) -> Unit,
+    onDelete: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialName) }
@@ -51,6 +57,8 @@ fun ExpenseFormSheet(
     var selectedPaymentSource by remember { mutableStateOf(initialPaymentSource) }
     var expandedDropdown by remember { mutableStateOf(false) }
     var expandedSourceDropdown by remember { mutableStateOf(false) }
+    var selectedDateMs by remember { mutableStateOf(initialDate) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     var nameError by remember { mutableStateOf<String?>(null) }
     var amountError by remember { mutableStateOf<String?>(null) }
@@ -65,18 +73,38 @@ fun ExpenseFormSheet(
             .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
-        // Form Title
-        Text(
-            text = when {
-                isEditMode -> "Edit Expense"
-                initialAmount != null -> "Capture Expense"
-                else -> "Log Expense Manually"
-            },
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = LightText,
-            modifier = Modifier.padding(bottom = 20.dp)
-        )
+        // Form Title + edit-mode delete action
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = when {
+                    isEditMode -> "Edit Expense"
+                    initialAmount != null -> "Capture Expense"
+                    else -> "Log Expense Manually"
+                },
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = LightText
+            )
+
+            if (isEditMode) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.testTag("expense_delete_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete expense",
+                        tint = ErrorRed
+                    )
+                }
+            }
+        }
 
         // Title/Name Field
         OutlinedTextField(
@@ -306,6 +334,76 @@ fun ExpenseFormSheet(
             }
         }
 
+        // Date Selection Field
+        Text(
+            text = "Date",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MutedText,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .border(1.dp, MutedText.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { showDatePicker = true }
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = "Date icon",
+                        tint = AccentYellow,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(selectedDateMs)),
+                        color = LightText,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // Date picker dialog
+        if (showDatePicker) {
+            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateMs)
+            DatePickerDialog(
+                onDismissRequest = { showDatePicker = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            datePickerState.selectedDateMillis?.let { dateMs ->
+                                selectedDateMs = dateMs
+                            }
+                            showDatePicker = false
+                        }
+                    ) {
+                        Text("OK", color = AccentYellow)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDatePicker = false }) {
+                        Text("Cancel")
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
+
         // Context check disclaimer if it is from parsed sms
         if (initialAmount != null) {
             Row(
@@ -313,8 +411,7 @@ fun ExpenseFormSheet(
                     .fillMaxWidth()
                     .background(AccentYellow.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                     .border(1.dp, AccentYellow.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                    .padding(12.dp)
-                    .padding(bottom = 20.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -325,11 +422,14 @@ fun ExpenseFormSheet(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "This expense was auto-parsed from your message inbox.",
+                    text = "Auto-parsed from your message inbox.",
                     fontSize = 12.sp,
-                    color = LightText.copy(alpha = 0.9f)
+                    color = LightText.copy(alpha = 0.9f),
+                    maxLines = 1
                 )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
         // Action Buttons Row (Dismiss & Save)
@@ -366,7 +466,7 @@ fun ExpenseFormSheet(
                     }
 
                     if (finalName.isNotEmpty() && amount != null && amount > 0.0) {
-                        onSave(finalName, amount, selectedCategory, selectedPaymentSource)
+                        onSave(finalName, amount, selectedCategory, selectedPaymentSource, selectedDateMs)
                     }
                 },
                 shape = RoundedCornerShape(24.dp),

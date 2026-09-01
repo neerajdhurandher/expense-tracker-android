@@ -36,6 +36,7 @@ class SyncEngine(
 
     private val _syncState = MutableStateFlow<SyncState>(SyncState.Idle)
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
+    private val userProfileStore = UserProfileStore(firestore)
 
     private val firebaseAuth: FirebaseAuth get() = FirebaseAuth.getInstance()
 
@@ -70,6 +71,7 @@ class SyncEngine(
         try {
             pushPendingChanges(uid)
             pullRemoteChanges(uid)
+            userProfileStore.updateLastSyncAt(uid)
             _syncState.value = SyncState.Success()
             Log.i(TAG, "══════ Full sync completed successfully ══════")
         } catch (e: Exception) {

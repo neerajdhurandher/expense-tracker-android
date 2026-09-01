@@ -11,7 +11,7 @@ import com.example.data.model.Expense
 import com.example.data.model.PaymentSource
 import com.example.data.model.SourceBudget
 
-@Database(entities = [Expense::class, Category::class, PaymentSource::class, SourceBudget::class], version = 5, exportSchema = false)
+@Database(entities = [Expense::class, Category::class, PaymentSource::class, SourceBudget::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun expenseDao(): ExpenseDao
     abstract fun categoryDao(): CategoryDao
@@ -88,6 +88,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE expenses ADD COLUMN createdAtLocalTime TEXT NOT NULL DEFAULT ''")
+                db.execSQL(
+                    "UPDATE expenses SET createdAtLocalTime = strftime('%Y-%m-%d %H:%M:%S', createdAt / 1000, 'unixepoch', 'localtime') WHERE createdAtLocalTime = ''"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -95,7 +104,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "expense_tracker_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

@@ -65,17 +65,21 @@ class BubbleActivity : ComponentActivity() {
                             initialAmount = if (amount > 0.0) amount else null,
                             initialCategory = initialCategory,
                             categories = categories,
-                            onSave = { name, finalAmount, category, paymentSource ->
+                            onSave = { name, finalAmount, category, paymentSource, selectedDate ->
                                 lifecycleScope.launch {
                                     if (expenseId > 0L) {
                                         // Update existing untracked expense and mark as tracked
                                         val existing = expenseRepo.getExpenseById(expenseId)
                                         if (existing != null) {
+                                            val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
+                                            val yearMonthStr = sdf.format(Date(selectedDate))
                                             val updated = existing.copy(
                                                 name = name,
                                                 amount = finalAmount,
                                                 category = category,
                                                 paymentSource = paymentSource,
+                                                occurredAt = selectedDate,
+                                                yearMonth = yearMonthStr,
                                                 isTracked = true
                                             )
                                             expenseRepo.updateExpense(updated)
@@ -83,7 +87,7 @@ class BubbleActivity : ComponentActivity() {
                                     } else {
                                         // Fallback: insert new expense
                                         val sdf = SimpleDateFormat("yyyy-MM", Locale.US)
-                                        val yearMonthStr = sdf.format(Date(occurredAt))
+                                        val yearMonthStr = sdf.format(Date(selectedDate))
 
                                         val expense = Expense(
                                             name = name,
@@ -92,7 +96,7 @@ class BubbleActivity : ComponentActivity() {
                                             source = "sms",
                                             rawSms = rawSms,
                                             sender = sender,
-                                            occurredAt = occurredAt,
+                                            occurredAt = selectedDate,
                                             createdAt = System.currentTimeMillis(),
                                             yearMonth = yearMonthStr,
                                             paymentSource = paymentSource

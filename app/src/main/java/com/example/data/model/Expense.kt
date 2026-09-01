@@ -2,6 +2,9 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 @Entity(tableName = "expenses")
@@ -16,6 +19,7 @@ data class Expense(
     val sender: String? = null,
     val occurredAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
+    val createdAtLocalTime: String = formatLocalDateTime(createdAt),
     val yearMonth: String, // Format: YYYY-MM
     val paymentSource: String = "UPI", // e.g. "Cash", "UPI", "Credit Card"
     val isTracked: Boolean = true, // false = untracked SMS expense pending user action
@@ -25,3 +29,9 @@ data class Expense(
     val isDeleted: Boolean = false,
     val syncStatus: Int = SyncStatus.PENDING
 )
+
+private fun formatLocalDateTime(timestampMillis: Long): String {
+    val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    return formatter.format(Date(timestampMillis))
+}
+
